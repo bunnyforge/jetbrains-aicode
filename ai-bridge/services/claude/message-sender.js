@@ -9,6 +9,7 @@ import { mapModelIdToSdkName, resolveModelFromSettings, setModelEnvironmentVaria
 import { AsyncStream } from '../../utils/async-stream.js';
 import { canUseTool } from '../../permission-handler.js';
 import { buildContentBlocks, loadAttachments } from './attachment-service.js';
+import { sendMessageWithAnthropicSDK } from './message-sender-anthropic.js';
 import { buildIDEContextPrompt } from '../system-prompts.js';
 import { buildQuickFixPrompt } from '../quickfix-prompts.js';
 import { emitAccumulatedUsage, mergeUsage } from '../../utils/usage-utils.js';
@@ -439,9 +440,17 @@ export async function sendMessage(message, resumeSessionId = null, cwd = null, p
   let streamingEnabled = false;
   const outerStreamState = { streamStarted: false, streamEnded: false, accumulatedUsage: null };
   try {
-    const { baseUrl, apiKeySource, baseUrlSource } = setupApiKey();
+    const { baseUrl, apiKey, authType, apiKeySource, baseUrlSource } = setupApiKey();
+    if (isCustomBaseUrl(baseUrl) && (authType === 'api_key' || authType === 'auth_token')) {
+      console.log('[DEBUG] Custom Base URL detected:', baseUrl, '- routing to Anthropic SDK fallback (third-party API)');
+      await sendMessageWithAnthropicSDK(
+        message, resumeSessionId, cwd, permissionMode, model,
+        apiKey, baseUrl, authType, []
+      );
+      return;
+    }
     if (isCustomBaseUrl(baseUrl)) {
-      console.log('[DEBUG] Custom Base URL detected:', baseUrl);
+      console.log('[DEBUG] Custom Base URL detected:', baseUrl, '- authType', authType, 'falls through to Claude Agent SDK');
     }
     console.log('[DEBUG] API config:', { apiKeySource, baseUrl: baseUrl || 'https://api.anthropic.com', baseUrlSource });
     console.log('[MESSAGE_START]');
@@ -508,7 +517,7 @@ export async function sendMessageWithAttachments(message, resumeSessionId = null
   let streamingEnabled = false;
   const outerStreamState = { streamStarted: false, streamEnded: false, accumulatedUsage: null };
   try {
-    setupApiKey();
+    const { baseUrl, apiKey, authType } = setupApiKey();
     console.log('[MESSAGE_START]');
 
     const workingDirectory = selectWorkingDirectory(cwd);
@@ -517,6 +526,15 @@ export async function sendMessageWithAttachments(message, resumeSessionId = null
     const attachments = await loadAttachments(stdinData);
     const openedFiles = stdinData?.openedFiles || null;
     const agentPrompt = stdinData?.agentPrompt || null;
+
+    if (isCustomBaseUrl(baseUrl) && (authType === 'api_key' || authType === 'auth_token')) {
+      console.log('[DEBUG] Custom Base URL detected:', baseUrl, '- routing to Anthropic SDK fallback (third-party API, with attachments)');
+      await sendMessageWithAnthropicSDK(
+        message, resumeSessionId, cwd, permissionMode, model,
+        apiKey, baseUrl, authType, attachments
+      );
+      return;
+    }
 
     const systemPromptAppend = buildSystemPromptAppend(openedFiles, agentPrompt, message);
 
