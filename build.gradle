@@ -37,7 +37,7 @@ version = '0.4.4'
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
-    // sinceBuild=243 means the plugin must run on IntelliJ 2024.3+,
+    // sinceBuild=253 means the plugin must run on IntelliJ 2025.3+,
     // which ships JBR 21. The toolchain version is set to the host JVM
     // (currently JDK 25) because the foojay auto-download endpoint is
     // unreachable from this network; bytecode compatibility with Java 21
@@ -65,22 +65,28 @@ dependencies {
     intellijPlatform {
         def targetIde = project.findProperty('targetIde') ?: 'IC'
         if (targetIde == 'PC') {
-            pycharmCommunity('2024.3')
+            // PC: PyCharm Community. As of 2025.3, PyCharm Community is no
+            // longer published as a separate artifact; the `pycharm` artifact
+            // (Professional base) is the only one and the build only links
+            // the community-licensed PythonCore plugin.
+            pycharm('2025.3')
             bundledPlugin('PythonCore')
         } else if (targetIde == 'PY') {
-            pycharmProfessional('2024.3')
+            pycharmProfessional('2025.3')
             bundledPlugin('Pythonid')
         } else {
-            // Default (IC): IntelliJ IDEA Community 2024.3.1. The resulting
-            // plugin is installable in any IntelliJ Platform-based IDE at
-            // build 243+ (PyCharm, WebStorm, GoLand, Android Studio, etc.);
+            // Default (IC): IntelliJ IDEA Community 2025.3. As of 2025.3,
+            // the `ideaIC` artifact is no longer published; `intellijIdea`
+            // (Ultimate base) is used and the community marker comes from
+            // the IntelliJPlatformType. Plugin targets IntelliJ Platform
+            // build 253+ (PyCharm, WebStorm, GoLand, Android Studio, etc.);
             // optional Java/Python/Terminal features degrade gracefully
             // via Class.forName reflection.
-            intellijIdeaCommunity('2024.3.1')
+            intellijIdea('2025.3')
             bundledPlugin('com.intellij.java')
             // Add Python plugin to support compiling PythonContextCollector.
-            // Pinned to 2025.3.2 (build 253) — middle of the
-            // sinceBuild=243 .. untilBuild=263.* range. See
+            // Pinned to 2025.3.x (build 253) — middle of the
+            // sinceBuild=253 .. untilBuild=273.* range. See
             // `externalPrefixes` below for the version-drift workaround
             // that lets the verifier (running 262.x EAP) accept 253.x
             // com.jetbrains.python references.
@@ -107,7 +113,7 @@ intellijPlatform {
         ]
 
         // PythonCore is pinned to 253.x for compileOnly use across the
-        // sinceBuild=243 .. untilBuild=263.* range. Verifier on 262.x EAP
+        // sinceBuild=253 .. untilBuild=273.* range. Verifier on 262.x EAP
         // cannot resolve com.jetbrains.python classes from a 253.x PythonCore,
         // so we mark the package as external — references from the optional
         // python-features.xml content module are guarded by the optional
@@ -142,7 +148,7 @@ sourceSets {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    // sinceBuild=243 requires Java 21 bytecode. Java 17 syntax is still
+    // sinceBuild=253 requires Java 21 bytecode. Java 17 syntax is still
     // accepted because --release=21 includes all Java 17 features.
     options.release.set(21)
 }
@@ -150,11 +156,13 @@ tasks.withType(JavaCompile).configureEach {
 // Ensure plugin.xml is patched with the correct since/until build and change notes
 patchPluginXml {
     // plugin compatibility range
-    // Dropped 2023.3 (build 233) support: that release ships JBR 17, which
-    // would force Java 17 bytecode and require extra toolchain juggling.
-    // 2024.3 (build 243) ships JBR 21, matching our Java 21 toolchain.
-    sinceBuild = '243'
-    untilBuild = '263.*'
+    // Bumped baseline from 2024.3 (build 243) to 2025.3 (build 253):
+    // 2025.3 ships JBR 21 and is the current stable IntelliJ IDEA
+    // Community release. The untilBuild is extended by 10 (273.*) to
+    // preserve the same 30-build compatibility window.
+    // 2023.3 (build 233) and 2024.3 (build 243) are no longer supported.
+    sinceBuild = '253'
+    untilBuild = '273.*'
 
     // Release notes shown in plugin repositories
     // Dynamically load the latest changelog entry from CHANGELOG.md and convert to simple HTML.
@@ -254,10 +262,20 @@ tasks.named('runIde') {
     // Configure log output to console
     systemProperty 'idea.log.debug.categories', '#com.github.claudecodegui'
 
-    // Point bridge resolver to pre-extracted ai-bridge with node_modules (dev only)
+    // Point bridge resolver to a pre-extracted ai-bridge with node_modules
+    // (dev only). Preference order: build/stable-ai-bridge/ (stable),
+    // otherwise the source ai-bridge/ directory. Both must already have
+    // node_modules/ installed (run `npm install` inside ai-bridge/ once).
+    // BridgePathLocator resolves this system property with the highest
+    // priority (Priority 1) so the plugin does not have to extract the
+    // bundled ai-bridge.zip on every runIde startup.
+    def sourceBridge = file("ai-bridge")
     def stableBridge = layout.buildDirectory.dir("stable-ai-bridge").get().asFile
-    if (stableBridge.exists()) {
-        systemProperty 'claude.bridge.path', stableBridge.absolutePath
+    def devBridge = [stableBridge, sourceBridge].find {
+        it.exists() && new File(it, 'node_modules').exists()
+    }
+    if (devBridge != null) {
+        systemProperty 'claude.bridge.path', devBridge.absolutePath
     }
 
     // Redirect standard output
@@ -497,7 +515,7 @@ tasks.matching { it.name.startsWith('prepareSandbox') }.configureEach {
         }
         def sandboxRoot = sandboxRootProvider.get().asFile
 
-        // Find all plugin directories (including versioned ones like IC-2024.3.1/plugins/)
+        // Find all plugin directories (including versioned ones like IC-2025.3/plugins/)
         def pluginDirs = []
 
         // Direct plugins directory

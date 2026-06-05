@@ -5,10 +5,9 @@ import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessListener;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -684,12 +683,12 @@ public class TerminalMonitorService implements ProjectActivity {
 
     private static void logGroupMembership(@NotNull ActionManager actionManager, @NotNull String groupId) {
         AnAction groupAction = actionManager.getAction(groupId);
-        if (!(groupAction instanceof ActionGroup)) {
-            LOG.debug("[TerminalSend] group missing or not ActionGroup: " + groupId);
+        if (!(groupAction instanceof DefaultActionGroup)) {
+            LOG.debug("[TerminalSend] group missing or not DefaultActionGroup: " + groupId);
             return;
         }
 
-        List<String> childIds = Arrays.stream(resolveActionGroupChildren((ActionGroup) groupAction))
+        List<String> childIds = Arrays.stream(resolveActionGroupChildren((DefaultActionGroup) groupAction))
                 .map(child -> actionManager.getId(child))
                 .collect(Collectors.toList());
         LOG.debug("[TerminalSend] group=" + groupId
@@ -698,12 +697,11 @@ public class TerminalMonitorService implements ProjectActivity {
                 + ", sampleChildren=" + childIds.stream().limit(12).collect(Collectors.toList()));
     }
 
-    private static AnAction[] resolveActionGroupChildren(@NotNull ActionGroup group) {
+    private static AnAction[] resolveActionGroupChildren(@NotNull DefaultActionGroup group) {
         try {
-            Method getChildren = group.getClass().getMethod("getChildren", AnActionEvent.class);
-            Object children = getChildren.invoke(group, new Object[]{null});
-            return children instanceof AnAction[] ? (AnAction[]) children : new AnAction[0];
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            AnAction[] children = group.getChildActionsOrStubs();
+            return children == null ? new AnAction[0] : children;
+        } catch (RuntimeException | LinkageError e) {
             LOG.debug("[TerminalSend] Failed to resolve action group children", e);
             return new AnAction[0];
         }
