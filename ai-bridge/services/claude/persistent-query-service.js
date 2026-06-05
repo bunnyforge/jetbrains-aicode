@@ -15,6 +15,7 @@ import { buildContentBlocks, loadAttachments } from './attachment-service.js';
 import { buildIDEContextPrompt } from '../system-prompts.js';
 import { buildQuickFixPrompt } from '../quickfix-prompts.js';
 import { registerActiveQueryResult, removeSession } from './message-service.js';
+import { sendMessageWithAnthropicSDK } from './message-sender-anthropic.js';
 import { normalizePermissionMode } from './permission-mode.js';
 import { redactSecrets, truncateString } from './message-output-filter.js';
 import {
@@ -483,6 +484,34 @@ async function sendInternal(params, withAttachments) {
   let requestContext = null;
   const sendStartTime = Date.now();
   try {
+    // THIRD-PARTY API ROUTING: bypass Claude Agent SDK (CLI subprocess has a
+    // hardcoded model allowlist that rejects third-party models such as
+    // 'minimax-m3' or 'qwen3.7-max'). Falls back to direct Anthropic SDK
+    // HTTP, which works for any Anthropic-compatible proxy.
+    let _apiConfig;
+    try {
+      _apiConfig = setupApiKey();
+    } catch (_setupErr) {
+      _apiConfig = null;
+    }
+    if (_apiConfig && isCustomBaseUrl(_apiConfig.baseUrl)
+        && (_apiConfig.authType === 'api_key' || _apiConfig.authType === 'auth_token')) {
+      console.log('[DEBUG] (persistent) Custom Base URL detected:', _apiConfig.baseUrl,
+        '- routing to Anthropic SDK fallback (third-party API)');
+      const attachments = withAttachments ? await loadAttachments(safeParams) : [];
+      await sendMessageWithAnthropicSDK(
+        safeParams?.message || '',
+        safeParams?.sessionId || null,
+        safeParams?.cwd || null,
+        safeParams?.permissionMode || 'default',
+        safeParams?.model || null,
+        _apiConfig.apiKey,
+        _apiConfig.baseUrl,
+        _apiConfig.authType,
+        attachments
+      );
+      return;
+    }
     requestContext = await buildRequestContext(safeParams, withAttachments);
     runtime = await acquireRuntime(requestContext, { registerActiveQueryResult, removeSession });
     await executeTurn(runtime, requestContext, turnMeta);
