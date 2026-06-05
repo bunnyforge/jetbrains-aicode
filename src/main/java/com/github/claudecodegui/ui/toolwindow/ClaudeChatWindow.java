@@ -65,6 +65,7 @@ public class ClaudeChatWindow {
     private volatile boolean disposed = false;
     private volatile boolean initialized = false;
     private volatile boolean frontendReady = false;
+    private final PendingCodeSnippetBuffer pendingCodeSnippetBuffer = new PendingCodeSnippetBuffer();
     private volatile boolean slashCommandsFetched = false;
     private final AtomicBoolean restoredHistoryLoadStarted = new AtomicBoolean(false);
 
@@ -426,7 +427,22 @@ public class ClaudeChatWindow {
     }
 
     public void addCodeSnippetFromExternal(String selectionInfo) {
-        addCodeSnippet(selectionInfo);
+        if (selectionInfo == null || selectionInfo.isEmpty()) {
+            return;
+        }
+        // offer() returns the snippet to emit now, or null when it was deferred
+        // until the frontend signals readiness (see flushPendingCodeSnippet).
+        String toEmit = pendingCodeSnippetBuffer.offer(selectionInfo, frontendReady);
+        if (toEmit != null) {
+            addCodeSnippet(toEmit);
+        }
+    }
+
+    private void flushPendingCodeSnippet() {
+        String snippet = pendingCodeSnippetBuffer.takePending();
+        if (snippet != null) {
+            addCodeSnippet(snippet);
+        }
     }
 
     public void updateTabStatus(ChatWindowDelegate.TabAnswerStatus status) {
@@ -683,8 +699,24 @@ public class ClaudeChatWindow {
 
     private void addCodeSnippet(String selectionInfo) {
         if (selectionInfo != null && !selectionInfo.isEmpty()) {
+            // Ensure the browser has focus so the frontend can focus the input field
+            if (browser != null) {
+                browser.getComponent().requestFocus();
+            }
             callJavaScript("addCodeSnippet", JsUtils.escapeJs(selectionInfo));
         }
+    }
+
+    /**
+     * Focus the chat input field in the frontend.
+     * Called when Ctrl+Alt+K activates the panel without a selection.
+     */
+    public void focusInputPane() {
+        if (disposed || browser == null) {
+            return;
+        }
+        browser.getComponent().requestFocus();
+        executeJavaScriptCode("window.focusChatInput?.()");
     }
 
     // ==================== Dispose ====================
@@ -841,6 +873,9 @@ public class ClaudeChatWindow {
             @Override
             public void setFrontendReady(boolean ready) {
                 frontendReady = ready;
+                if (ready) {
+                    flushPendingCodeSnippet();
+                }
             }
         };
     }
@@ -970,6 +1005,9 @@ public class ClaudeChatWindow {
             @Override
             public void setFrontendReady(boolean ready) {
                 frontendReady = ready;
+                if (ready) {
+                    flushPendingCodeSnippet();
+                }
             }
 
             @Override

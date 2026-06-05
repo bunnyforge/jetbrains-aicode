@@ -176,6 +176,11 @@ interface Window {
   insertCodeSnippetAtCursor?: (selectionInfo: string) => void;
 
   /**
+   * Focus the chat input box - registered by ChatInputBox
+   */
+  focusChatInput?: () => void;
+
+  /**
    * Clear selection info
    */
   clearSelectionInfo?: () => void;
@@ -325,6 +330,11 @@ interface Window {
   updateNodePath?: (path: string) => void;
 
   /**
+   * Update custom Claude CLI path
+   */
+  updateClaudeCliPath?: (path: string) => void;
+
+  /**
    * Update working directory configuration
    */
   updateWorkingDirectory?: (json: string) => void;
@@ -431,9 +441,19 @@ interface Window {
   applyUiFontConfig?: (config: import('./types/uiFontConfig').UiFontConfig | string) => void;
 
   /**
+   * Apply effective plugin code font configuration (called from Java backend)
+   */
+  applyCodeFontConfig?: (config: import('./types/uiFontConfig').CodeFontConfig | string) => void;
+
+  /**
    * Pending effective UI font config before applyUiFontConfig is registered
    */
   __pendingUiFontConfig?: import('./types/uiFontConfig').UiFontConfig;
+
+  /**
+   * Pending effective code font config before applyCodeFontConfig is registered
+   */
+  __pendingCodeFontConfig?: import('./types/uiFontConfig').CodeFontConfig;
 
   /**
    * Apply IDEA language configuration (called from Java backend)
@@ -485,6 +505,11 @@ interface Window {
    * Effective UI font config received callback
    */
   onUiFontConfigReceived?: (json: string) => void;
+
+  /**
+   * Effective code font config received callback
+   */
+  onCodeFontConfigReceived?: (json: string) => void;
 
   /**
    * IDE theme received callback - receives IDE theme configuration
