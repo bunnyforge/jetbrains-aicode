@@ -6,7 +6,6 @@ import com.github.claudecodegui.i18n.ClaudeCodeGuiBundle;
 import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.action.SendShortcutSync;
 import com.github.claudecodegui.provider.claude.ClaudeHistoryReader;
-import com.github.claudecodegui.provider.codex.CodexHistoryReader;
 import com.github.claudecodegui.util.FontConfigService;
 import com.github.claudecodegui.util.ThemeConfigService;
 import com.google.gson.Gson;
@@ -213,31 +212,6 @@ public class ProjectConfigHandler {
             "Failed to save streaming config");
     }
 
-    public void handleGetCodexSandboxMode() {
-        respondWithJson("window.updateCodexSandboxMode",
-            () -> jsonOf("sandboxMode", settingsService.getCodexSandboxMode(context.getProject().getBasePath())),
-            jsonOf("sandboxMode", "danger-full-access"),
-            "Failed to get Codex sandbox mode");
-    }
-
-    public void handleSetCodexSandboxMode(String content) {
-        try {
-            String projectPath = context.getProject().getBasePath();
-            JsonObject json = gson.fromJson(content, JsonObject.class);
-            String sandboxMode = readString(json, "sandboxMode", "danger-full-access");
-            settingsService.setCodexSandboxMode(projectPath, sandboxMode);
-            LOG.info("[ProjectConfigHandler] Set Codex sandbox mode: " + sandboxMode);
-            ApplicationManager.getApplication().invokeLater(() -> {
-                context.callJavaScript("window.updateCodexSandboxMode",
-                    context.escapeJs(gson.toJson(jsonOf("sandboxMode", sandboxMode))));
-                context.callJavaScript("window.showSuccessI18n", "toast.saveSuccess");
-            });
-        } catch (Exception e) {
-            LOG.error("[ProjectConfigHandler] Failed to set Codex sandbox mode: " + e.getMessage(), e);
-            showError("Failed to save Codex sandbox mode: " + e.getMessage());
-        }
-    }
-
     public void handleGetAutoOpenFileEnabled() {
         respondWithJson("window.updateAutoOpenFileEnabled",
             () -> {
@@ -406,7 +380,7 @@ public class ProjectConfigHandler {
 
     @FunctionalInterface
     private interface AiProviderSetter {
-        void apply(String provider, String claudeModel, String codexModel) throws Exception;
+        void apply(String provider, String claudeModel) throws Exception;
     }
 
     @FunctionalInterface
@@ -422,7 +396,7 @@ public class ProjectConfigHandler {
             JsonObject models = json != null && json.has("models") && json.get("models").isJsonObject()
                     ? json.getAsJsonObject("models")
                     : new JsonObject();
-            setter.apply(provider, readString(models, "claude", null), readString(models, "codex", null));
+            setter.apply(provider, readString(models, "claude", null));
             pushJson(jsCallback, getter.get());
         } catch (Exception e) {
             LOG.error("[ProjectConfigHandler] " + errorLogMessage + ": " + e.getMessage(), e);
@@ -728,12 +702,11 @@ public class ProjectConfigHandler {
         }
     }
 
-    /** Get usage statistics. Supports both Claude and Codex providers. */
+    /** Get usage statistics. */
     public void handleGetUsageStatistics(String content) {
         CompletableFuture.runAsync(() -> {
             try {
                 String projectPath = "all";
-                String provider = "claude";
                 long cutoffTime = 0;
                 if (content != null && !content.isEmpty() && !content.equals("{}")) {
                     try {
@@ -741,9 +714,6 @@ public class ProjectConfigHandler {
                         if (json.has("scope")) {
                             projectPath = "current".equals(json.get("scope").getAsString())
                                 ? context.getProject().getBasePath() : "all";
-                        }
-                        if (json.has("provider")) {
-                            provider = json.get("provider").getAsString();
                         }
                         if (json.has("dateRange")) {
                             String dateRange = json.get("dateRange").getAsString();
@@ -755,17 +725,20 @@ public class ProjectConfigHandler {
                         projectPath = "current".equals(content) ? context.getProject().getBasePath() : content;
                     }
                 }
-                String json;
-                if ("codex".equals(provider)) {
-                    CodexHistoryReader reader = new CodexHistoryReader();
-                    CodexHistoryReader.ProjectStatistics stats = reader.getProjectStatistics(projectPath, cutoffTime);
-                    LOG.info("[ProjectConfigHandler] Codex statistics - sessions: " + stats.totalSessions +
-                             ", cost: " + stats.estimatedCost + ", total tokens: " + stats.totalUsage.totalTokens);
-                    json = gson.toJson(stats);
-                } else {
-                    ClaudeHistoryReader reader = new ClaudeHistoryReader();
-                    json = gson.toJson(reader.getProjectStatistics(projectPath, cutoffTime));
-                }
+                ClaudeHistoryReader reader = new ClaudeHistoryReader(model -> {
+                    try {
+                        com.google.gson.JsonObject claudeSettings = context.getSettingsService().readClaudeSettings();
+                        if (claudeSettings == null || !claudeSettings.has("env") || !claudeSettings.get("env").isJsonObject()) {
+                            return model;
+                        }
+                        return com.github.claudecodegui.handler.provider.ModelProviderHandler.resolveConfiguredClaudeModel(
+                                model, claudeSettings.getAsJsonObject("env"));
+                    } catch (Exception e) {
+                        LOG.warn("[ProjectConfigHandler] Failed to resolve model name from Claude settings: " + e.getMessage());
+                        return model;
+                    }
+                });
+                String json = gson.toJson(reader.getProjectStatistics(projectPath, cutoffTime));
                 final String statsJson = json;
                 ApplicationManager.getApplication().invokeLater(() ->
                     context.callJavaScript("window.updateUsageStatistics", context.escapeJs(statsJson)));

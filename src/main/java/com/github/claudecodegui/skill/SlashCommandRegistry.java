@@ -65,13 +65,7 @@ public final class SlashCommandRegistry {
     );
 
     // Codex built-in commands (GUI-relevant only; CLI-only ones like /status, /model, /quit are excluded)
-    public static final List<SlashCommand> CODEX_BUILTIN = List.of(
-            new SlashCommand("/compact", "Summarize conversation to free tokens", "builtin"),
-            new SlashCommand("/diff", "Show pending changes diff including untracked files", "builtin"),
-            new SlashCommand("/init", "Generate an AGENTS.md scaffold", "builtin"),
-            new SlashCommand("/plan", "Switch to plan mode", "builtin"),
-            new SlashCommand("/review", "Review working tree changes", "builtin")
-    );
+    public static final List<SlashCommand> CODEX_BUILTIN = List.of();
 
     /**
      * Gets the list of directories to scan for Claude skills or commands.
@@ -164,9 +158,6 @@ public final class SlashCommandRegistry {
      * Gets the merged slash command list for a given provider and working directory.
      */
     public static List<SlashCommand> getCommands(String provider, String cwd, String currentFilePath) {
-        boolean isCodex = "codex".equalsIgnoreCase(provider);
-
-        List<SlashCommand> builtins = isCodex ? CODEX_BUILTIN : CLAUDE_BUILTIN;
         String userHome = resolveUserHome();
         Path currentFile = SlashCommandPathPolicy.toNormalizedPath(currentFilePath);
 
@@ -180,46 +171,36 @@ public final class SlashCommandRegistry {
         List<SlashCommand> pluginSkillCommands = List.of();
         List<SlashCommand> pluginCmdCommands = List.of();
 
-        if (isCodex) {
-            if (userHome.isEmpty()) {
-                globalCmdCommands = List.of();
-            } else {
-                globalCmdCommands = PromptCommandScanner.scanPromptsAsCommands(
-                        userHome + File.separator + ".codex" + File.separator + "prompts");
-            }
+        if (userHome.isEmpty()) {
+            globalCmdCommands = List.of();
             globalSkillCommands = List.of();
         } else {
-            if (userHome.isEmpty()) {
-                globalCmdCommands = List.of();
-                globalSkillCommands = List.of();
-            } else {
-                String claudeDir = userHome + File.separator + ".claude";
-                globalCmdCommands = scanCommandsAsCommands(
-                        claudeDir + File.separator + "commands", "user");
-                globalSkillCommands = scanSkillsAsCommands(
-                        claudeDir + File.separator + "skills", "user", null, currentFile);
-            }
-
-            if (cwd != null && !cwd.isEmpty()) {
-                List<SkillScanDir> cmdDirs = getCommandScanDirs(cwd);
-                List<SkillScanDir> skillDirs = getSkillsScanDirs(cwd);
-
-                localCmdCommands = scanCommandsFromDirs(cmdDirs, "local");
-                localSkillCommands = scanSkillsFromDirs(skillDirs, "local", null, currentFile);
-
-                List<String> additionalDirs = getAdditionalDirectories(cwd, userHome);
-                additionalCmdCommands = scanAdditionalCommands(additionalDirs);
-                additionalSkillCommands = scanAdditionalSkills(additionalDirs, currentFile);
-            }
-
-            managedSkillCommands = ManagedSkillScanner.scanManagedSkills(getManagedDirectory(), currentFilePath);
-            List<PluginPath> allPluginPaths = PluginCommandScanner.getPluginPaths(cwd, userHome);
-            pluginSkillCommands = PluginCommandScanner.scanPluginSkills(allPluginPaths, currentFilePath);
-            pluginCmdCommands = PluginCommandScanner.scanPluginCommands(allPluginPaths);
+            String claudeDir = userHome + File.separator + ".claude";
+            globalCmdCommands = scanCommandsAsCommands(
+                    claudeDir + File.separator + "commands", "user");
+            globalSkillCommands = scanSkillsAsCommands(
+                    claudeDir + File.separator + "skills", "user", null, currentFile);
         }
 
+        if (cwd != null && !cwd.isEmpty()) {
+            List<SkillScanDir> cmdDirs = getCommandScanDirs(cwd);
+            List<SkillScanDir> skillDirs = getSkillsScanDirs(cwd);
+
+            localCmdCommands = scanCommandsFromDirs(cmdDirs, "local");
+            localSkillCommands = scanSkillsFromDirs(skillDirs, "local", null, currentFile);
+
+            List<String> additionalDirs = getAdditionalDirectories(cwd, userHome);
+            additionalCmdCommands = scanAdditionalCommands(additionalDirs);
+            additionalSkillCommands = scanAdditionalSkills(additionalDirs, currentFile);
+        }
+
+        managedSkillCommands = ManagedSkillScanner.scanManagedSkills(getManagedDirectory(), currentFilePath);
+        List<PluginPath> allPluginPaths = PluginCommandScanner.getPluginPaths(cwd, userHome);
+        pluginSkillCommands = PluginCommandScanner.scanPluginSkills(allPluginPaths, currentFilePath);
+        pluginCmdCommands = PluginCommandScanner.scanPluginCommands(allPluginPaths);
+
         return mergeCommandsInOrder(
-                builtins,
+                CLAUDE_BUILTIN,
                 localCmdCommands,
                 localSkillCommands,
                 additionalCmdCommands,
@@ -247,39 +228,6 @@ public final class SlashCommandRegistry {
             array.add(obj);
         }
         return new Gson().toJson(array);
-    }
-
-    /**
-     * Gets Codex skills as $-prefixed commands for autocomplete.
-     */
-    public static List<SlashCommand> getCodexSkills(String cwd) {
-        JsonObject allSkills = CodexSkillService.getAllSkills(cwd);
-
-        Map<String, SlashCommand> merged = new LinkedHashMap<>();
-        for (String scope : new String[]{"user", "repo"}) {
-            JsonObject scopeSkills = allSkills.getAsJsonObject(scope);
-            if (scopeSkills == null) {
-                continue;
-            }
-
-            for (String key : scopeSkills.keySet()) {
-                JsonObject skill = scopeSkills.getAsJsonObject(key);
-
-                if (skill.has("enabled") && !skill.get("enabled").getAsBoolean()) {
-                    continue;
-                }
-                if (skill.has("userInvocable") && !skill.get("userInvocable").getAsBoolean()) {
-                    continue;
-                }
-
-                String name = skill.has("name") ? skill.get("name").getAsString() : "";
-                String desc = skill.has("description") ? skill.get("description").getAsString() : "";
-                if (!name.isEmpty()) {
-                    merged.put("$" + name, new SlashCommand("$" + name, desc, "codex-skill"));
-                }
-            }
-        }
-        return new ArrayList<>(merged.values());
     }
 
     /**

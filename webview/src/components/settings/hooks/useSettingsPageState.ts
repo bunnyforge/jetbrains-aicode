@@ -1,11 +1,9 @@
 // hooks/useSettingsPageState.ts
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { SettingsTab } from '../SettingsSidebar';
 import type { AlertType } from '../../AlertDialog';
 import type { ToastMessage } from '../../Toast';
 
-// Auto-collapse threshold (window width)
 export const AUTO_COLLAPSE_THRESHOLD = 900;
 
 export interface UseSettingsPageStateReturn {
@@ -30,24 +28,12 @@ export interface UseSettingsPageStateReturn {
 
 interface UseSettingsPageStateProps {
   initialTab?: SettingsTab;
-  isCodexMode: boolean;
-  disabledTabs: SettingsTab[];
 }
 
 export function useSettingsPageState({
   initialTab,
-  isCodexMode,
-  disabledTabs,
 }: UseSettingsPageStateProps): UseSettingsPageStateReturn {
-  const { t } = useTranslation();
-
-  const [currentTab, setCurrentTab] = useState<SettingsTab>(() => {
-    const initial = initialTab || 'basic';
-    if (isCodexMode && disabledTabs.includes(initial)) {
-      return 'basic';
-    }
-    return initial;
-  });
+  const [currentTab, setCurrentTab] = useState<SettingsTab>(() => initialTab || 'basic');
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -60,18 +46,15 @@ export function useSettingsPageState({
     message: string;
   }>({ isOpen: false, type: 'info', title: '', message: '' });
 
-  // Determine whether to collapse: prefer manual setting, otherwise auto-detect based on window width
   const isCollapsed = useMemo(
     () => (manualCollapsed !== null ? manualCollapsed : windowWidth < AUTO_COLLAPSE_THRESHOLD),
     [manualCollapsed, windowWidth]
   );
 
-  // Listen for window resize events
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
 
-      // If window resize should trigger auto-collapse state change, reset manual setting
       const shouldAutoCollapse = window.innerWidth < AUTO_COLLAPSE_THRESHOLD;
       if (manualCollapsed !== null && manualCollapsed === shouldAutoCollapse) {
         setManualCollapsed(null);
@@ -85,39 +68,15 @@ export function useSettingsPageState({
     };
   }, [manualCollapsed]);
 
-  // Sync tab when codex mode changes
-  useEffect(() => {
-    if (isCodexMode && disabledTabs.includes(currentTab)) {
-      setCurrentTab('basic');
-    }
-  }, [isCodexMode, disabledTabs, currentTab]);
-
-  const handleTabChange = useCallback(
-    (tab: SettingsTab) => {
-      if (isCodexMode && disabledTabs.includes(tab)) {
-        setToasts((prev) => [
-          ...prev,
-          {
-            id: `toast-${Date.now()}-${Math.random()}`,
-            message: t('settings.codexFeatureUnavailable'),
-            type: 'warning' as ToastMessage['type'],
-          },
-        ]);
-        return;
-      }
-      setCurrentTab(tab);
-    },
-    [isCodexMode, disabledTabs, t]
-  );
+  const handleTabChange = useCallback((tab: SettingsTab) => {
+    setCurrentTab(tab);
+  }, []);
 
   const toggleManualCollapse = useCallback(() => {
     if (manualCollapsed === null) {
-      // If currently in auto mode, switch to manual mode
-      // isCollapsed reflects the current auto-state, so negate it
       const currentIsCollapsed = window.innerWidth < AUTO_COLLAPSE_THRESHOLD;
       setManualCollapsed(!currentIsCollapsed);
     } else {
-      // If already in manual mode, toggle the state
       setManualCollapsed(!manualCollapsed);
     }
   }, [manualCollapsed]);

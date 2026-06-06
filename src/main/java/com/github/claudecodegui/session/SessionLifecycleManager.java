@@ -6,7 +6,7 @@ import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.handler.core.HandlerContext;
 import com.github.claudecodegui.handler.SettingsHandler;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.opencode.OpencodeSDKBridge;
 import com.github.claudecodegui.skill.SlashCommandRegistry;
 import com.github.claudecodegui.util.JsUtils;
 import com.github.claudecodegui.util.PlatformUtils;
@@ -19,7 +19,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.jcef.JBCefBrowser;
 
 import java.io.File;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -39,7 +38,7 @@ public class SessionLifecycleManager {
 
         ClaudeSDKBridge getClaudeSDKBridge();
 
-        CodexSDKBridge getCodexSDKBridge();
+        OpencodeSDKBridge getOpencodeSDKBridge();
 
         ClaudeSession getSession();
 
@@ -243,7 +242,7 @@ public class SessionLifecycleManager {
             }
 
             ClaudeSession newSession = new ClaudeSession(
-                    host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge());
+                    host.getProject(), host.getClaudeSDKBridge(), host.getOpencodeSDKBridge());
             newSession.setPermissionMode(previousPermissionMode);
             newSession.setProvider(provider != null && !provider.trim().isEmpty() ? provider : previousProvider);
             newSession.setModel(previousModel);
@@ -348,25 +347,9 @@ public class SessionLifecycleManager {
         LOG.info("Slash commands resolved locally: " + commands.size() + " commands");
 
         // Pre-compute Codex skills outside EDT to avoid file I/O on UI thread
-        final List<SlashCommandRegistry.SlashCommand> codexSkills;
-        final String codexSkillsJson;
-        if ("codex".equalsIgnoreCase(provider)) {
-            codexSkills = SlashCommandRegistry.getCodexSkills(cwd);
-            codexSkillsJson = SlashCommandRegistry.toJson(codexSkills);
-            LOG.info("Codex skills resolved: " + codexSkills.size() + " skills");
-        } else {
-            codexSkills = null;
-            codexSkillsJson = null;
-        }
-
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
                 host.callJavaScript("updateSlashCommands", JsUtils.escapeJs(commandsJson));
-
-                // Push Codex skills as separate channel for $ autocomplete
-                if (codexSkillsJson != null) {
-                    host.callJavaScript("window.updateDollarCommands", JsUtils.escapeJs(codexSkillsJson));
-                }
             } catch (Exception e) {
                 LOG.warn("Failed to send slash commands to frontend: " + e.getMessage(), e);
             }
@@ -433,7 +416,7 @@ public class SessionLifecycleManager {
     }
 
     private ClaudeSession createDefaultSession() {
-        return new ClaudeSession(host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge());
+        return new ClaudeSession(host.getProject(), host.getClaudeSDKBridge(), host.getOpencodeSDKBridge());
     }
 
     private void completeNewSessionBootstrap(ClaudeSession newSession, String workingDirectory, String successLogPrefix) {

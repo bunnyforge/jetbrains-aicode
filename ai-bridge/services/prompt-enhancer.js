@@ -1,6 +1,6 @@
 /**
  * Prompt Enhancement Service.
- * Routes enhancement requests to Claude or Codex based on prompt enhancer config.
+ * Routes enhancement requests to Claude based on prompt enhancer config.
  *
  * Supports context information:
  * - User selected code snippets
@@ -14,17 +14,13 @@ import { pathToFileURL } from 'node:url';
 import {
   loadClaudeSdk,
   isClaudeSdkAvailable,
-  loadCodexSdk,
-  isCodexSdkAvailable,
 } from '../utils/sdk-loader.js';
 import { setupApiKey, buildCliEnv } from '../config/api-config.js';
 import { mapModelIdToSdkName } from '../utils/model-utils.js';
 import { getRealHomeDir } from '../utils/path-utils.js';
 import { getClaudeCliPathOverride } from '../utils/claude-cli-path.js';
-import { buildCodexCliEnvironment } from './codex/codex-utils.js';
 
 let claudeSdk = null;
-let codexSdk = null;
 
 const DEFAULT_PROMPT_ENHANCER_CONFIG = {
   provider: null,
@@ -32,11 +28,9 @@ const DEFAULT_PROMPT_ENHANCER_CONFIG = {
   resolutionSource: 'auto',
   models: {
     claude: 'claude-sonnet-4-6',
-    codex: 'gpt-5.5',
   },
   availability: {
     claude: false,
-    codex: false,
   },
 };
 
@@ -50,18 +44,6 @@ async function ensureClaudeSdk() {
     claudeSdk = await loadClaudeSdk();
   }
   return claudeSdk;
-}
-
-async function ensureCodexSdk() {
-  if (!codexSdk) {
-    if (!isCodexSdkAvailable()) {
-      const error = new Error('Codex SDK not installed. Please install via Settings > Dependencies.');
-      error.code = 'SDK_NOT_INSTALLED';
-      throw error;
-    }
-    codexSdk = await loadCodexSdk();
-  }
-  return codexSdk;
 }
 
 // Context length limits (in characters) to avoid exceeding model token limits
@@ -232,18 +214,16 @@ function normalizePromptEnhancerConfig(config) {
   }
 
   return {
-    provider: config.provider === 'claude' || config.provider === 'codex' ? config.provider : null,
-    effectiveProvider: config.effectiveProvider === 'claude' || config.effectiveProvider === 'codex'
+    provider: config.provider === 'claude' ? config.provider : null,
+    effectiveProvider: config.effectiveProvider === 'claude'
       ? config.effectiveProvider
       : null,
     resolutionSource: typeof config.resolutionSource === 'string' ? config.resolutionSource : 'auto',
     models: {
       claude: config.models?.claude || DEFAULT_PROMPT_ENHANCER_CONFIG.models.claude,
-      codex: config.models?.codex || DEFAULT_PROMPT_ENHANCER_CONFIG.models.codex,
     },
     availability: {
       claude: Boolean(config.availability?.claude),
-      codex: Boolean(config.availability?.codex),
     },
   };
 }
@@ -259,15 +239,6 @@ export function resolvePromptEnhancerRuntimeConfig({ promptEnhancerConfig, legac
 
   const config = normalizePromptEnhancerConfig(promptEnhancerConfig);
   const claudeSdkInstalled = isClaudeSdkAvailable();
-  const codexSdkInstalled = isCodexSdkAvailable();
-
-  if (config.effectiveProvider === 'codex') {
-    return {
-      provider: 'codex',
-      model: config.models.codex || DEFAULT_PROMPT_ENHANCER_CONFIG.models.codex,
-      resolutionSource: config.resolutionSource,
-    };
-  }
 
   if (config.effectiveProvider === 'claude') {
     return {
@@ -277,13 +248,6 @@ export function resolvePromptEnhancerRuntimeConfig({ promptEnhancerConfig, legac
     };
   }
 
-  if (config.provider === 'codex') {
-    if (!codexSdkInstalled) {
-      throw new Error('Codex prompt enhancer is unavailable because the Codex SDK is not installed. Please install it in Settings > Dependencies.');
-    }
-    throw new Error('Codex prompt enhancer is unavailable because no active Codex provider is configured.');
-  }
-
   if (config.provider === 'claude') {
     if (!claudeSdkInstalled) {
       throw new Error('Claude Code prompt enhancer is unavailable because the Claude Code SDK is not installed. Please install it in Settings > Dependencies.');
@@ -291,11 +255,11 @@ export function resolvePromptEnhancerRuntimeConfig({ promptEnhancerConfig, legac
     throw new Error('Claude Code prompt enhancer is unavailable because no active Claude Code provider is configured.');
   }
 
-  if (!codexSdkInstalled && !claudeSdkInstalled) {
-    throw new Error('No available prompt enhancer provider is configured because both Claude Code and Codex SDKs are not installed.');
+  if (!claudeSdkInstalled) {
+    throw new Error('No available prompt enhancer provider is configured because the Claude Code SDK is not installed.');
   }
 
-  throw new Error('No available prompt enhancer provider is configured. Please configure Codex or Claude Code in Settings.');
+  throw new Error('No available prompt enhancer provider is configured. Please configure Claude Code in Settings.');
 }
 
 async function enhancePromptWithClaude(originalPrompt, systemPrompt, model, context) {
@@ -371,74 +335,7 @@ export function extractAppendedDelta(previousText, nextText) {
   return next.slice(previous.length);
 }
 
-async function enhancePromptWithCodex(originalPrompt, systemPrompt, model, context) {
-  const sdk = await ensureCodexSdk();
-  const Codex = sdk.Codex || sdk.default || sdk;
-  const { cliEnv } = buildCodexCliEnvironment(process.env);
-  const codex = new Codex({ env: cliEnv });
-
-  const workingDirectory = getRealHomeDir();
-  const systemPromptText = (systemPrompt || '').trim();
-  const fullPrompt = [
-    systemPromptText,
-    '',
-    buildFullPrompt(originalPrompt, context),
-    '',
-    'Remember: output only the optimized prompt text with no explanation.',
-  ].join('\n');
-  console.log(`[PromptEnhancer] Full prompt length: ${fullPrompt.length}`);
-
-  const thread = codex.startThread({
-    skipGitRepoCheck: true,
-    maxTurns: 1,
-    workingDirectory,
-    model,
-    sandboxMode: 'read-only',
-    approvalPolicy: 'never',
-  });
-
-  console.log(`[PromptEnhancer] Calling Codex SDK with model: ${model}`);
-
-  const { events } = await thread.runStreamed(fullPrompt);
-  let responseText = '';
-  let lastAgentMessage = '';
-
-  for await (const event of events) {
-    console.log(`[PromptEnhancer] Codex event: ${event.type}`);
-    if (event.type === 'item.updated' || event.type === 'item.completed') {
-      const item = event.item;
-      if (item?.type === 'agent_message' && typeof item.text === 'string') {
-        const delta = extractAppendedDelta(lastAgentMessage, item.text);
-        if (delta) {
-          responseText += delta;
-        }
-        lastAgentMessage = item.text;
-      }
-      continue;
-    }
-
-    if (event.type === 'turn.failed') {
-      throw new Error(event.error?.message || 'Codex enhancement turn failed');
-    }
-
-    if (event.type === 'error') {
-      throw new Error(event.message || 'Codex enhancement failed');
-    }
-  }
-
-  const finalText = responseText.trim() || lastAgentMessage.trim();
-  console.log(`[PromptEnhancer] Codex response text length: ${finalText.length}`);
-  if (finalText) {
-    return finalText;
-  }
-
-  throw new Error('Codex enhancement response is empty');
-}
-
 async function enhancePrompt(originalPrompt, systemPrompt, runtimeConfig, context) {
-  if (runtimeConfig.provider === 'codex') {
-    return enhancePromptWithCodex(originalPrompt, systemPrompt, runtimeConfig.model, context);
-  }
   return enhancePromptWithClaude(originalPrompt, systemPrompt, runtimeConfig.model, context);
 }
 

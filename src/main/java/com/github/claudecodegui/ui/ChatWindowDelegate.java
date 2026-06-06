@@ -6,7 +6,6 @@ import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.handler.AgentHandler;
 import com.github.claudecodegui.handler.ClipboardHandler;
 import com.github.claudecodegui.handler.ContextHandler;
-import com.github.claudecodegui.handler.CodexMcpServerHandler;
 import com.github.claudecodegui.handler.DependencyHandler;
 import com.github.claudecodegui.handler.DiffHandler;
 import com.github.claudecodegui.handler.core.HandlerContext;
@@ -30,7 +29,6 @@ import com.github.claudecodegui.handler.file.OpenClassHandler;
 import com.github.claudecodegui.handler.file.UndoFileHandler;
 import com.github.claudecodegui.permission.PermissionService;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.github.claudecodegui.provider.common.MessageCallback;
 import com.github.claudecodegui.provider.common.SDKResult;
 import com.github.claudecodegui.session.SessionLifecycleManager;
@@ -71,7 +69,6 @@ public class ChatWindowDelegate {
     public interface DelegateHost {
         Project getProject();
         ClaudeSDKBridge getClaudeSDKBridge();
-        CodexSDKBridge getCodexSDKBridge();
         ClaudeSession getSession();
         CodemossSettingsService getSettingsService();
         JPanel getMainPanel();
@@ -111,7 +108,6 @@ public class ChatWindowDelegate {
 
     public void loadNodePathFromSettings() {
         ClaudeSDKBridge claudeSDKBridge = host.getClaudeSDKBridge();
-        CodexSDKBridge codexSDKBridge = host.getCodexSDKBridge();
         try {
             PropertiesComponent props = PropertiesComponent.getInstance();
             String savedNodePath = props.getValue(NODE_PATH_PROPERTY_KEY);
@@ -119,7 +115,6 @@ public class ChatWindowDelegate {
             if (savedNodePath != null && !savedNodePath.trim().isEmpty()) {
                 String path = savedNodePath.trim();
                 claudeSDKBridge.setNodeExecutable(path);
-                codexSDKBridge.setNodeExecutable(path);
                 claudeSDKBridge.verifyAndCacheNodePath(path);
                 LOG.info("Using manually configured Node.js path: " + path);
             } else {
@@ -133,7 +128,6 @@ public class ChatWindowDelegate {
 
                     props.setValue(NODE_PATH_PROPERTY_KEY, detectedPath);
                     claudeSDKBridge.setNodeExecutable(detectedPath);
-                    codexSDKBridge.setNodeExecutable(detectedPath);
                     claudeSDKBridge.verifyAndCacheNodePath(detectedPath);
 
                     LOG.info("Auto-detected Node.js: " + detectedPath + " (" + detectedVersion + ")");
@@ -191,23 +185,15 @@ public class ChatWindowDelegate {
 
     public String setupPermissionService() {
         ClaudeSDKBridge claudeSDKBridge = host.getClaudeSDKBridge();
-        CodexSDKBridge codexSDKBridge = host.getCodexSDKBridge();
         Project project = host.getProject();
         String sessionId = claudeSDKBridge.getSessionId();
 
-        if ((sessionId == null || sessionId.isEmpty()) && codexSDKBridge != null) {
-            sessionId = codexSDKBridge.getSessionId();
-        }
-
         if (sessionId == null || sessionId.isEmpty()) {
-            LOG.warn("Failed to get session ID from bridges, generating fallback UUID");
+            LOG.warn("Failed to get session ID from bridge, generating fallback UUID");
             sessionId = java.util.UUID.randomUUID().toString();
         }
 
         claudeSDKBridge.setSessionId(sessionId);
-        if (codexSDKBridge != null) {
-            codexSDKBridge.setSessionId(sessionId);
-        }
         LOG.info("Unified bridge sessionId for PermissionService routing: " + sessionId);
 
         PermissionService permissionService = PermissionService.getInstance(project, sessionId);
@@ -225,7 +211,6 @@ public class ChatWindowDelegate {
     public void initializeHandlers() {
         Project project = host.getProject();
         ClaudeSDKBridge claudeSDKBridge = host.getClaudeSDKBridge();
-        CodexSDKBridge codexSDKBridge = host.getCodexSDKBridge();
         CodemossSettingsService settingsService = host.getSettingsService();
 
         HandlerContext.JsCallback jsCallback = new HandlerContext.JsCallback() {
@@ -239,7 +224,7 @@ public class ChatWindowDelegate {
             }
         };
 
-        HandlerContext handlerContext = new HandlerContext(project, claudeSDKBridge, codexSDKBridge, settingsService, jsCallback);
+        HandlerContext handlerContext = new HandlerContext(project, claudeSDKBridge, settingsService, jsCallback);
         handlerContext.setSession(host.getSession());
         host.setHandlerContext(handlerContext);
 
@@ -248,7 +233,6 @@ public class ChatWindowDelegate {
 
         messageDispatcher.registerHandler(new ProviderHandler(handlerContext));
         messageDispatcher.registerHandler(new McpServerHandler(handlerContext));
-        messageDispatcher.registerHandler(new CodexMcpServerHandler(handlerContext, settingsService.getCodexMcpServerManager()));
         messageDispatcher.registerHandler(new SkillHandler(handlerContext));
         messageDispatcher.registerHandler(new FileHandler(handlerContext));
         messageDispatcher.registerHandler(new SettingsHandler(handlerContext));

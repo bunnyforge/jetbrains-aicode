@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,6 +40,7 @@ class ClaudeUsageAggregator {
     private static final Pricing LEGACY_OPUS_PRICING = new Pricing(15.0, 75.0, 18.75, 1.50);
     private static final Pricing OPUS_4_5_PRICING = new Pricing(5.0, 25.0, 6.25, 0.50);
     private static final Pricing HAIKU_4_5_PRICING = new Pricing(1.0, 5.0, 1.25, 0.10);
+    private static final Pricing UNKNOWN_PRICING = new Pricing(0, 0, 0, 0);
 
     private static final Map<String, Pricing> MODEL_PRICING = Map.ofEntries(
             Map.entry("claude-opus-4", LEGACY_OPUS_PRICING),
@@ -76,10 +78,16 @@ class ClaudeUsageAggregator {
 
     private final Path projectsDir;
     private final ClaudeHistoryParser parser;
+    private final Function<String, String> modelResolver;
 
     ClaudeUsageAggregator(Path projectsDir, ClaudeHistoryParser parser) {
+        this(projectsDir, parser, null);
+    }
+
+    ClaudeUsageAggregator(Path projectsDir, ClaudeHistoryParser parser, Function<String, String> modelResolver) {
         this.projectsDir = projectsDir;
         this.parser = parser;
+        this.modelResolver = modelResolver != null ? modelResolver : (model -> model);
     }
 
     ClaudeHistoryReader.ProjectStatistics getProjectStatistics(String projectPath, long cutoffTime) {
@@ -174,7 +182,7 @@ class ClaudeUsageAggregator {
     private ClaudeHistoryReader.SessionSummary parseSessionFile(Path filePath) {
         ClaudeHistoryReader.UsageData usage = new ClaudeHistoryReader.UsageData();
         double totalCost = 0;
-        String model = UNKNOWN_MODEL;
+        String rawModel = UNKNOWN_MODEL;
         long firstTimestamp = 0;
         String summary = null;
 
@@ -217,12 +225,12 @@ class ClaudeUsageAggregator {
                         continue;
                     }
 
-                    if (UNKNOWN_MODEL.equals(model)) {
-                        model = readString(message, "model", UNKNOWN_MODEL);
+                    if (UNKNOWN_MODEL.equals(rawModel)) {
+                        rawModel = readString(message, "model", UNKNOWN_MODEL);
                     }
 
                     mergeUsage(usage, delta);
-                    totalCost += calculateCost(delta, model);
+                    totalCost += calculateCost(delta, modelResolver.apply(rawModel));
                 } catch (Exception ignored) {
                 }
             }
@@ -234,10 +242,13 @@ class ClaudeUsageAggregator {
             return null;
         }
 
+        String resolvedModel = modelResolver.apply(rawModel);
         ClaudeHistoryReader.SessionSummary session = new ClaudeHistoryReader.SessionSummary();
         session.sessionId = filePath.getFileName().toString().replace(JSONL_SUFFIX, "");
         session.timestamp = firstTimestamp > 0 ? firstTimestamp : System.currentTimeMillis();
-        session.model = UNKNOWN_MODEL.equals(model) ? DEFAULT_MODEL : model;
+        session.model = UNKNOWN_MODEL.equals(resolvedModel) || resolvedModel == null || resolvedModel.isBlank()
+                ? DEFAULT_MODEL
+                : resolvedModel;
         session.usage = usage;
         session.cost = totalCost;
         session.summary = summary;
@@ -268,7 +279,19 @@ class ClaudeUsageAggregator {
     }
 
     private Pricing resolvePricing(String model) {
-        return MODEL_PRICING.getOrDefault(normalizeModel(model), DEFAULT_PRICING);
+        if (model == null || model.isBlank()) {
+            return UNKNOWN_PRICING;
+        }
+        String normalized = normalizeModel(model);
+        Pricing pricing = MODEL_PRICING.get(normalized);
+        if (pricing != null) {
+            return pricing;
+        }
+        // Preserve legacy fallback for unrecognized Claude aliases (e.g. future
+        // releases not yet added to MODEL_PRICING): bill them as sonnet-4-6.
+        // Third-party models (e.g. minimax/m2.5) have no known Claude pricing,
+        // so they return UNKNOWN_PRICING and contribute $0 to the total cost.
+        return model.toLowerCase().contains("claude") ? DEFAULT_PRICING : UNKNOWN_PRICING;
     }
 
     private String normalizeModel(String model) {

@@ -11,10 +11,8 @@ export const DEFAULT_PROMPT_ENHANCER_CONFIG: PromptEnhancerConfig = {
   resolutionSource: 'auto',
   models: {
     claude: DEFAULT_AI_FEATURE_MODELS.claude,
-    codex: DEFAULT_AI_FEATURE_MODELS.codex,
   },
   availability: {
     claude: false,
-    codex: false,
   },
 };

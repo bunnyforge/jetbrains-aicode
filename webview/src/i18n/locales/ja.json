@@ -505,7 +505,7 @@
             "proxyConfigCodeLabel": "~/.claude/settings.json",
             "proxyConfigCode": "{\n  \"env\": {\n    \"HTTP_PROXY\": \"http://127.0.0.1:7897\",\n    \"HTTPS_PROXY\": \"http://127.0.0.1:7897\"\n  }\n}",
             "issuePrefix": "それでも解決しない場合は、GitHub に問題を報告してください：",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           },
           "codex": {
             "title": "Codex サブスクリプションアカウントのセットアップ",
@@ -519,7 +519,7 @@
             "proxyConfigCodeLabel": "",
             "proxyConfigCode": "",
             "issuePrefix": "それでも解決しない場合は、GitHub に問題を報告してください：",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           }
         }
       },
@@ -588,7 +588,8 @@
         "xiaomi": "Xiaomi MiMo",
         "xiaomiPlan": "Xiaomi MiMo Plan",
         "qwen": "Alibaba Qwen",
-        "openrouter": "OpenRouter"
+        "openrouter": "OpenRouter",
+        "opencode": "OpenCode"
       }
     },
     "comingSoon": "近日公開予定...",
@@ -714,7 +715,11 @@
         "confirmAdd": "Create",
         "saveChanges": "Save"
       }
-    }
+    },
+    "wechatIdLabel": "WeChat ID",
+    "wechatCopyBtn": "コピー",
+    "wechatCopied": "WeChat IDをクリップボードにコピーしました",
+    "wechatCopyFailed": "コピーに失敗しました。手動でコピーしてください"
   },
   "history": {
     "title": "履歴",

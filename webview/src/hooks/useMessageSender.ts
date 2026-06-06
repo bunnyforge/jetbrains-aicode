@@ -2,7 +2,6 @@ import { useCallback, type RefObject } from 'react';
 import type { TFunction } from 'i18next';
 import { sendBridgeEvent } from '../utils/bridge';
 import type { ClaudeContentBlock, ClaudeMessage } from '../types';
-import { apply1MContextSuffix } from '../components/ChatInputBox/types';
 import type { Attachment, ChatInputBoxHandle, PermissionMode, SelectedAgent } from '../components/ChatInputBox/types';
 import type { ViewMode } from './useModelProviderState';
 
@@ -29,6 +28,13 @@ export interface UseMessageSenderOptions {
   addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   currentProvider: string;
   selectedModel: string;
+  /**
+   * The real (post-mapping) model id used at runtime, e.g. when a Claude
+   * alias is mapped to a third-party model. Prefer this over `selectedModel`
+   * when sending model-scoped requests so the backend computes usage
+   * against the actual model, not the Claude alias.
+   */
+  activeModelId?: string;
   permissionMode: PermissionMode;
   selectedAgent: SelectedAgent | null;
   sdkStatusLoaded: boolean;
@@ -47,7 +53,6 @@ export interface UseMessageSenderOptions {
   setCurrentView: React.Dispatch<React.SetStateAction<ViewMode>>;
   forceCreateNewSession: () => void;
   handleModeSelect?: (mode: PermissionMode) => void;
-  longContextEnabled?: boolean;
   openContextUsageDialog: (requestId?: string | null, loading?: boolean) => void;
   closeContextUsageDialog: (requestId?: string | null) => boolean;
 }
@@ -60,6 +65,7 @@ export function useMessageSender({
   addToast,
   currentProvider,
   selectedModel,
+  activeModelId,
   permissionMode,
   selectedAgent,
   sdkStatusLoaded,
@@ -78,7 +84,6 @@ export function useMessageSender({
   setCurrentView,
   forceCreateNewSession,
   handleModeSelect,
-  longContextEnabled,
   openContextUsageDialog,
   closeContextUsageDialog,
 }: UseMessageSenderOptions) {
@@ -144,11 +149,14 @@ export function useMessageSender({
       // Open dialog with loading state immediately
       openContextUsageDialog(requestId, true);
 
-      // Send bridge event to fetch context usage with current model
-      // Apply [1m] suffix if long context is enabled so the SDK creates
-      // a runtime with the correct context window limit.
+      // Send bridge event to fetch context usage. Use the resolved model
+      // id (post-mapping) so the backend computes usage against the real
+      // model, not the Claude alias — e.g. when claude-sonnet-4-6 is
+      // mapped to minimax/m2.5, the dashboard should reflect the M2.5
+      // context window and category breakdown.
+      const modelForBackend = activeModelId ?? selectedModel;
       const sent = sendBridgeEvent('get_context_usage', JSON.stringify({
-        model: apply1MContextSuffix(selectedModel, longContextEnabled ?? false),
+        model: modelForBackend,
         requestId,
       }));
 
@@ -161,7 +169,7 @@ export function useMessageSender({
       return true;
     }
     return false;
-  }, [currentProvider, selectedModel, longContextEnabled, addToast, t, openContextUsageDialog, closeContextUsageDialog]);
+  }, [currentProvider, selectedModel, addToast, t, openContextUsageDialog, closeContextUsageDialog]);
 
   /**
    * Check for unimplemented slash commands

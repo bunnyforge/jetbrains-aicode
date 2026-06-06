@@ -193,10 +193,20 @@
 }
 
 .selector-option .model-description {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  line-height: 1;
   color: var(--text-secondary);
   font-family: inherit;
-  margin-top: 2px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: var(--vscode-badge-background, rgba(127, 127, 127, 0.12));
+  border-radius: 8px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .selector-option .mode-description {
@@ -287,6 +297,273 @@
   15% { opacity: 1; transform: translateX(-50%) translateY(0); }
   85% { opacity: 1; transform: translateX(-50%) translateY(0); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+/* ============================================================
+   Reasoning Select (thinking toggle + level picker)
+   ============================================================ */
+
+/* Outer button — icon-only when collapsed, lightbulb accent on active */
+.selector-button.reasoning-toggle {
+  position: relative;
+  padding: 4px 6px;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s, box-shadow 0.2s;
+}
+
+.selector-button.reasoning-toggle .codicon-lightbulb-sparkle,
+.selector-button.reasoning-toggle .codicon-lightbulb-empty {
+  font-size: 13px;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.selector-button.reasoning-toggle.active {
+  color: var(--reasoning-accent, #b794f6);
+  background: var(--reasoning-bg-active, rgba(183, 148, 246, 0.12));
+}
+
+.selector-button.reasoning-toggle.active .codicon-lightbulb-sparkle {
+  text-shadow: 0 0 6px var(--reasoning-accent-glow, rgba(183, 148, 246, 0.55));
+}
+
+.selector-button.reasoning-toggle.active:hover {
+  background: var(--reasoning-bg-active-hover, rgba(183, 148, 246, 0.2));
+}
+
+/* Dropdown panel — fixed width so the level list never shifts */
+.reasoning-dropdown {
+  min-width: 190px;
+  padding: 4px 0;
+}
+
+.reasoning-dropdown .selector-dropdown {
+  /* override shared .selector-dropdown min-width inside our panel */
+  min-width: 190px;
+}
+
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  min-height: 36px;
+}
+
+.reasoning-header-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.reasoning-header-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.reasoning-header-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Polished switch — pill track with sliding knob */
+.reasoning-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.reasoning-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.reasoning-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--reasoning-track-off, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.reasoning-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+  pointer-events: none;
+}
+
+.reasoning-switch input:checked + .reasoning-switch-track {
+  background: var(--reasoning-accent, #b794f6);
+}
+
+.reasoning-switch input:checked + .reasoning-switch-track .reasoning-switch-knob {
+  transform: translateX(14px);
+}
+
+.reasoning-switch input:focus-visible + .reasoning-switch-track {
+  box-shadow: 0 0 0 2px var(--reasoning-accent-glow, rgba(183, 148, 246, 0.45));
+}
+
+/* Section divider with label */
+.reasoning-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.reasoning-divider {
+  height: 1px;
+  background: var(--dropdown-border);
+  opacity: 0.5;
+  margin: 0;
+}
+
+/* Levels list — fixed height rows; fades when toggle is off (no layout shift) */
+.reasoning-levels {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 6px;
+  transition: opacity 0.18s ease;
+}
+
+.reasoning-levels.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.reasoning-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.reasoning-level:hover {
+  background: var(--dropdown-hover);
+}
+
+.reasoning-level.selected {
+  background: var(--reasoning-selected-bg, rgba(183, 148, 246, 0.16));
+}
+
+/* Dot-bar indicator — clear visual progression of thinking depth */
+.reasoning-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: 36px;
+  flex-shrink: 0;
+  justify-content: flex-start;
+}
+
+.reasoning-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.reasoning-level:hover .reasoning-dot {
+  background: var(--text-secondary);
+}
+
+.reasoning-level.selected .reasoning-dot {
+  background: var(--reasoning-accent, #b794f6);
+}
+
+.reasoning-level.selected .reasoning-dot:last-child {
+  transform: scale(1.4);
+}
+
+.reasoning-level-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.reasoning-level-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.reasoning-level-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reasoning-level-check {
+  font-size: 12px;
+  color: var(--reasoning-accent, #b794f6);
+  flex-shrink: 0;
+}
+
+/* Theme variables — light theme overrides */
+[data-theme="light"] .chat-input-box {
+  --reasoning-accent: #7c3aed;
+  --reasoning-accent-glow: rgba(124, 58, 237, 0.35);
+  --reasoning-bg-active: rgba(124, 58, 237, 0.1);
+  --reasoning-bg-active-hover: rgba(124, 58, 237, 0.18);
+  --reasoning-icon-bg: rgba(124, 58, 237, 0.12);
+  --reasoning-track-off: rgba(0, 0, 0, 0.18);
+  --reasoning-selected-bg: rgba(124, 58, 237, 0.12);
+}
+
+[data-theme="light"] .reasoning-switch-knob {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] .chat-input-box,
+:root .chat-input-box {
+  --reasoning-accent: #b794f6;
+  --reasoning-accent-glow: rgba(183, 148, 246, 0.55);
+  --reasoning-bg-active: rgba(183, 148, 246, 0.14);
+  --reasoning-bg-active-hover: rgba(183, 148, 246, 0.22);
+  --reasoning-icon-bg: rgba(183, 148, 246, 0.16);
+  --reasoning-track-off: rgba(255, 255, 255, 0.16);
+  --reasoning-selected-bg: rgba(183, 148, 246, 0.18);
 }
 
 /* ============================================================

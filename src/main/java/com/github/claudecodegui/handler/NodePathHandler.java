@@ -53,7 +53,6 @@ public class NodePathHandler {
                             + ", clearing and triggering re-detection");
                         props.unsetValue(NODE_PATH_PROPERTY_KEY);
                         this.context.getClaudeSDKBridge().setNodeExecutable(null);
-                        this.context.getCodexSDKBridge().setNodeExecutable(null);
 
                         NodeDetectionResult detected = this.context.getClaudeSDKBridge().detectNodeWithDetails();
                         if (detected != null && detected.isFound() && detected.getNodePath() != null) {
@@ -61,7 +60,6 @@ public class NodePathHandler {
                             versionToSend = detected.getNodeVersion();
                             props.setValue(NODE_PATH_PROPERTY_KEY, pathToSend);
                             this.context.getClaudeSDKBridge().verifyAndCacheNodePath(pathToSend);
-                            this.context.getCodexSDKBridge().setNodeExecutable(pathToSend);
                         }
                     }
                 } else {
@@ -72,7 +70,6 @@ public class NodePathHandler {
                         props.setValue(NODE_PATH_PROPERTY_KEY, pathToSend);
                         // Use verifyAndCacheNodePath instead of setNodeExecutable to ensure version info is cached
                         context.getClaudeSDKBridge().verifyAndCacheNodePath(pathToSend);
-                        context.getCodexSDKBridge().setNodeExecutable(pathToSend);
                     }
                 }
 
@@ -135,7 +132,6 @@ public class NodePathHandler {
                 if (pathArg == null || pathArg.isEmpty()) {
                     props.unsetValue(NODE_PATH_PROPERTY_KEY);
                     context.getClaudeSDKBridge().setNodeExecutable(null);
-                    context.getCodexSDKBridge().setNodeExecutable(null);
                     LOG.info("[NodePathHandler] Cleared manual Node.js path from settings");
 
                     NodeDetectionResult detected = context.getClaudeSDKBridge().detectNodeWithDetails();
@@ -145,7 +141,6 @@ public class NodePathHandler {
                         props.setValue(NODE_PATH_PROPERTY_KEY, finalPath);
                         // Use verifyAndCacheNodePath to ensure version info is cached
                         context.getClaudeSDKBridge().verifyAndCacheNodePath(finalPath);
-                        context.getCodexSDKBridge().setNodeExecutable(finalPath);
                         verifySuccess = true;
                     } else {
                         failureMsg = "已清空自定义路径，但无法自动检测到 Node.js，请手动配置路径";
@@ -156,7 +151,6 @@ public class NodePathHandler {
                     if (result != null && result.isFound()) {
                         // Only save if verification succeeds
                         props.setValue(NODE_PATH_PROPERTY_KEY, pathArg);
-                        context.getCodexSDKBridge().setNodeExecutable(pathArg);
                         finalPath = pathArg;
                         versionToSend = result.getNodeVersion();
                         verifySuccess = true;

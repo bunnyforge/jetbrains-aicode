@@ -1,17 +1,14 @@
 /**
- * Stdin reader utility module (unified version).
- * Supports both Claude and Codex SDKs.
+ * Stdin reader utility module for the Claude SDK bridge.
  */
 
 /**
  * Read JSON data from stdin.
- * @param {string} provider - 'claude' or 'codex'
+ * @param {string} provider - 'claude' (kept for API compatibility, unused)
  * @returns {Promise<Object|null>} The parsed JSON object, or null
  */
 export async function readStdinData(provider = 'claude') {
-  // Check whether stdin input is enabled
-  const envKey = provider === 'codex' ? 'CODEX_USE_STDIN' : 'CLAUDE_USE_STDIN';
-  if (process.env[envKey] !== 'true') {
+  if (process.env.CLAUDE_USE_STDIN !== 'true') {
     return null;
   }
 

@@ -7,25 +7,23 @@ import {
   extractAppendedDelta,
 } from './prompt-enhancer.js';
 
-test('resolvePromptEnhancerRuntimeConfig prefers Codex when auto mode has both providers available', () => {
+test('resolvePromptEnhancerRuntimeConfig prefers Claude when auto mode selects the provider', () => {
   const resolved = resolvePromptEnhancerRuntimeConfig({
     promptEnhancerConfig: {
       provider: null,
-      effectiveProvider: 'codex',
+      effectiveProvider: 'claude',
       resolutionSource: 'auto',
       models: {
         claude: 'claude-sonnet-4-6',
-        codex: 'gpt-5.5',
       },
       availability: {
         claude: true,
-        codex: true,
       },
     },
   });
 
-  assert.equal(resolved.provider, 'codex');
-  assert.equal(resolved.model, 'gpt-5.5');
+  assert.equal(resolved.provider, 'claude');
+  assert.equal(resolved.model, 'claude-sonnet-4-6');
 });
 
 test('resolvePromptEnhancerRuntimeConfig throws a strict error when manual provider is unavailable', () => {
@@ -37,11 +35,9 @@ test('resolvePromptEnhancerRuntimeConfig throws a strict error when manual provi
         resolutionSource: 'unavailable',
         models: {
           claude: 'claude-opus-4-7',
-          codex: 'gpt-5.4',
         },
         availability: {
           claude: false,
-          codex: true,
         },
       },
     }),

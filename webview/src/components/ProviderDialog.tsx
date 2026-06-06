@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderConfig } from '../types/provider';
 import { CLAUDE_MODEL_MAPPING_ENV_KEYS, PROVIDER_PRESETS } from '../types/provider';
+import { ProviderModelField } from './settings/ProviderModelField';
 
 const INFO_ICON_STYLE: React.CSSProperties = { fontSize: '12px', marginRight: '4px' };
 const NOTICE_MT_STYLE: React.CSSProperties = { marginTop: '8px' };
@@ -337,20 +338,17 @@ export default function ProviderDialog({
     setActivePreset(detectMatchingPreset({ ANTHROPIC_BASE_URL: newApiUrl }));
   };
 
-  const handleHaikuModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleHaikuModelChange = (value: string) => {
     setHaikuModel(value);
     updateEnvField('ANTHROPIC_DEFAULT_HAIKU_MODEL', value);
   };
 
-  const handleSonnetModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleSonnetModelChange = (value: string) => {
     setSonnetModel(value);
     updateEnvField('ANTHROPIC_DEFAULT_SONNET_MODEL', value);
   };
 
-  const handleOpusModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleOpusModelChange = (value: string) => {
     setOpusModel(value);
     updateEnvField('ANTHROPIC_DEFAULT_OPUS_MODEL', value);
   };
@@ -597,10 +595,8 @@ export default function ProviderDialog({
               <div className="model-mapping-grid">
                 <div className="model-mapping-field">
                   <label htmlFor="sonnetModel">{t('settings.provider.dialog.sonnetModel')}</label>
-                  <input
+                  <ProviderModelField
                     id="sonnetModel"
-                    type="text"
-                    className="form-input"
                     placeholder={t('settings.provider.dialog.sonnetModelPlaceholder')}
                     value={sonnetModel}
                     onChange={handleSonnetModelChange}
@@ -608,10 +604,8 @@ export default function ProviderDialog({
                 </div>
                 <div className="model-mapping-field">
                   <label htmlFor="opusModel">{t('settings.provider.dialog.opusModel')}</label>
-                  <input
+                  <ProviderModelField
                     id="opusModel"
-                    type="text"
-                    className="form-input"
                     placeholder={t('settings.provider.dialog.opusModelPlaceholder')}
                     value={opusModel}
                     onChange={handleOpusModelChange}
@@ -619,10 +613,8 @@ export default function ProviderDialog({
                 </div>
                 <div className="model-mapping-field">
                   <label htmlFor="haikuModel">{t('settings.provider.dialog.haikuModel')}</label>
-                  <input
+                  <ProviderModelField
                     id="haikuModel"
-                    type="text"
-                    className="form-input"
                     placeholder={t('settings.provider.dialog.haikuModelPlaceholder')}
                     value={haikuModel}
                     onChange={handleHaikuModelChange}

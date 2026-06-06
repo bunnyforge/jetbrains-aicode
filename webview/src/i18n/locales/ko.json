@@ -531,7 +531,7 @@
             "proxyConfigCodeLabel": "~/.claude/settings.json",
             "proxyConfigCode": "{\n  \"env\": {\n    \"HTTP_PROXY\": \"http://127.0.0.1:7897\",\n    \"HTTPS_PROXY\": \"http://127.0.0.1:7897\"\n  }\n}",
             "issuePrefix": "그래도 작동하지 않으면 GitHub에 이슈를 보고해주세요: ",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           },
           "codex": {
             "title": "Codex 구독 계정 설정",
@@ -545,7 +545,7 @@
             "proxyConfigCodeLabel": "",
             "proxyConfigCode": "",
             "issuePrefix": "그래도 작동하지 않으면 GitHub에 이슈를 보고해주세요: ",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           }
         }
       },
@@ -614,7 +614,8 @@
         "xiaomi": "Xiaomi MiMo",
         "xiaomiPlan": "Xiaomi MiMo Plan",
         "qwen": "Alibaba Qwen",
-        "openrouter": "OpenRouter"
+        "openrouter": "OpenRouter",
+        "opencode": "OpenCode"
       }
     },
     "comingSoon": "곧 출시 예정...",
@@ -825,7 +826,11 @@
         "selectHint": "내보낼 프롬프트를 선택하세요",
         "confirmExport": "내보내기 확인"
       }
-    }
+    },
+    "wechatIdLabel": "WeChat ID",
+    "wechatCopyBtn": "복사",
+    "wechatCopied": "WeChat ID가 클립보드에 복사되었습니다",
+    "wechatCopyFailed": "복사 실패, 수동으로 복사해주세요"
   },
   "history": {
     "title": "히스토리",

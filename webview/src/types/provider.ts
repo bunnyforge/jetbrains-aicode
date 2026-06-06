@@ -37,8 +37,6 @@ export function isSpecialProviderId(id: string): boolean {
  * localStorage keys for provider-related data
  */
 export const STORAGE_KEYS = {
-  /** Custom Codex model list */
-  CODEX_CUSTOM_MODELS: 'codex-custom-models',
   /** Claude model mapping configuration */
   CLAUDE_MODEL_MAPPING: 'claude-model-mapping',
   /** Custom Claude model list */
@@ -81,37 +79,6 @@ export function isValidModelId(id: string): boolean {
   const trimmed = id.trim();
   if (trimmed.length === 0 || trimmed.length > 256) return false;
   return true;
-}
-
-/**
- * Validate whether a CodexCustomModel object is valid
- * @param model - Object to validate
- * @returns Whether it is a valid CodexCustomModel
- */
-export function isValidCodexCustomModel(model: unknown): model is CodexCustomModel {
-  if (!model || typeof model !== 'object') return false;
-  const obj = model as Record<string, unknown>;
-
-  // id must be a valid model ID
-  if (typeof obj.id !== 'string' || !isValidModelId(obj.id)) return false;
-
-  // label must be a string
-  if (typeof obj.label !== 'string' || obj.label.trim().length === 0) return false;
-
-  // description is optional, but must be a string if present
-  if (obj.description !== undefined && typeof obj.description !== 'string') return false;
-
-  return true;
-}
-
-/**
- * Validate and filter a CodexCustomModel array
- * @param models - Array to validate
- * @returns Array of valid CodexCustomModel entries
- */
-export function validateCodexCustomModels(models: unknown): CodexCustomModel[] {
-  if (!Array.isArray(models)) return [];
-  return models.filter(isValidCodexCustomModel);
 }
 
 // ============ Types ============
@@ -161,7 +128,7 @@ export type ProviderCategory =
   | 'custom';       // Custom
 
 /**
- * Codex custom model configuration
+ * Codex custom model configuration (retained for type compatibility)
  */
 export interface CodexCustomModel {
   /** Model ID (unique identifier) */
@@ -173,113 +140,7 @@ export interface CodexCustomModel {
 }
 
 /**
- * Single environment variable entry
- */
-export interface EnvVarEntry {
-  /** Environment variable name */
-  key: string;
-  /** Environment variable value */
-  value: string;
-}
-
-/**
- * Codex protected environment variable names that cannot be overridden by custom env vars.
- */
-export const CODEX_PROTECTED_ENV_KEYS: ReadonlySet<string> = new Set([
-  'CODEX_USE_STDIN',
-  'CODEX_MODEL',
-  'CODEX_SANDBOX_MODE',
-  'CODEX_SANDBOX',
-  'CODEX_APPROVAL_POLICY',
-  'CODEX_CI',
-  'CODEX_SANDBOX_NETWORK_DISABLED',
-  'CODEX_HOME',
-  'CLAUDE_SESSION_ID',
-  'CLAUDE_PERMISSION_DIR',
-  'HOME',
-  'PATH',
-  'TMPDIR',
-  'TEMP',
-  'TMP',
-  'IDEA_PROJECT_PATH',
-  'PROJECT_PATH',
-  'CLAUDE_USE_STDIN',
-]);
-
-/**
- * Maximum length for env var values. Long values risk exceeding the OS
- * ARG_MAX limit when the child process is spawned.
- * Must stay in sync with MAX_ENV_VAR_VALUE_LENGTH in CodexSDKBridge.java.
- */
-export const ENV_VAR_VALUE_MAX_LENGTH = 16 * 1024;
-
-/**
- * Validate whether an env var key name is valid.
- * Must start with letter or underscore, followed by letters, digits, or underscores.
- */
-export function isValidEnvVarKey(key: string): boolean {
-  if (!key || typeof key !== 'string') return false;
-  return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key);
-}
-
-/**
- * Check if an env var key is a protected Codex built-in variable.
- *
- * NOTE: comparison is case-insensitive (key is uppercased before lookup).
- * On Linux/macOS env vars are case-sensitive, but we conservatively reject
- * any case-variant of a protected name to keep behavior consistent across
- * platforms (Windows env vars are case-insensitive).
- */
-export function isProtectedEnvVarKey(key: string): boolean {
-  return CODEX_PROTECTED_ENV_KEYS.has(key.toUpperCase());
-}
-
-export interface EnvVarValidationIssue {
-  index: number;
-  field: 'key' | 'value';
-  reason: 'invalid' | 'protected' | 'duplicate' | 'value_too_long';
-  key?: string;
-}
-
-/**
- * Validate a list of EnvVarEntry. Returns the first issue per row, if any.
- * Empty keys are skipped (will be filtered before saving).
- */
-export function validateEnvVarEntries(entries: EnvVarEntry[]): EnvVarValidationIssue[] {
-  const issues: EnvVarValidationIssue[] = [];
-  const seenKeys = new Set<string>();
-
-  entries.forEach((entry, index) => {
-    if (entry.value.length > ENV_VAR_VALUE_MAX_LENGTH) {
-      issues.push({ index, field: 'value', reason: 'value_too_long' });
-    }
-
-    const key = entry.key.trim();
-    if (!key) return;
-
-    if (!isValidEnvVarKey(key)) {
-      issues.push({ index, field: 'key', reason: 'invalid', key });
-      return;
-    }
-
-    if (isProtectedEnvVarKey(key)) {
-      issues.push({ index, field: 'key', reason: 'protected', key });
-      return;
-    }
-
-    const upperKey = key.toUpperCase();
-    if (seenKeys.has(upperKey)) {
-      issues.push({ index, field: 'key', reason: 'duplicate', key });
-      return;
-    }
-    seenKeys.add(upperKey);
-  });
-
-  return issues;
-}
-
-/**
- * Codex provider configuration
+ * Codex provider configuration (retained for type compatibility)
  */
 export interface CodexProviderConfig {
   /** Unique provider ID */
@@ -298,10 +159,6 @@ export interface CodexProviderConfig {
   authJson?: string;
   /** Custom model list */
   customModels?: CodexCustomModel[];
-  /** Environment variables for sendMessage subprocess */
-  messageEnvVars?: EnvVarEntry[];
-  /** Environment variables for getMcpServerTools subprocess */
-  mcpEnvVars?: EnvVarEntry[];
 }
 
 // ============ Provider Presets ============
@@ -420,6 +277,22 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'anthropic/claude-haiku-4.5',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'anthropic/claude-sonnet-4.5',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'anthropic/claude-opus-4.5',
+    },
+  },
+  {
+    id: 'opencode',
+    nameKey: 'settings.provider.presets.opencode',
+    env: {
+      // OpenCode exposes a Zen gateway. The back-end detects the opencode
+      // base URL pattern at runtime and applies a protocol conversion
+      // (Anthropic-format request → upstream wire format) before sending.
+      // Default to the public Zen endpoint; users can swap in a self-hosted
+      // gateway or a local oc-go-cc proxy (default :3456) at the same field.
+      ANTHROPIC_BASE_URL: 'https://opencode.ai/zen/v1',
+      ANTHROPIC_AUTH_TOKEN: '',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'big-pickle',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'big-pickle',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'big-pickle',
     },
   },
 ];

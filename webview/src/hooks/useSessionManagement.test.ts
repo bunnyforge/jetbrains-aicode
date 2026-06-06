@@ -345,6 +345,7 @@ describe('useSessionManagement', () => {
   });
 
   it('shows confirm dialog when creating new session with existing messages', () => {
+    localStorage.setItem('skipNewSessionConfirm', 'false');
     const mocks = createMocks();
 
     const { result } = renderHook(() =>
@@ -470,6 +471,7 @@ describe('useSessionManagement', () => {
   });
 
   it('handleConfirmNewSession cleans state and creates new session', () => {
+    localStorage.setItem('skipNewSessionConfirm', 'false');
     const mocks = createMocks();
 
     const { result } = renderHook(() =>

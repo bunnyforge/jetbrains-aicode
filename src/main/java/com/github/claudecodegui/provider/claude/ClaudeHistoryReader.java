@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -38,9 +39,13 @@ public class ClaudeHistoryReader {
     private final ClaudeHistorySearchService searchService;
 
     public ClaudeHistoryReader() {
+        this(null);
+    }
+
+    public ClaudeHistoryReader(Function<String, String> modelResolver) {
         this.parser = new ClaudeHistoryParser();
         this.indexService = new ClaudeHistoryIndexService(PROJECTS_DIR, parser);
-        this.usageAggregator = new ClaudeUsageAggregator(PROJECTS_DIR, parser);
+        this.usageAggregator = new ClaudeUsageAggregator(PROJECTS_DIR, parser, modelResolver);
         this.searchService = new ClaudeHistorySearchService(PROJECTS_DIR, this, indexService);
     }
 

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CLAUDE_MODELS, CODEX_MODELS } from '../../ChatInputBox/types';
 import { ProviderModelIcon } from '../../shared/ProviderModelIcon';
+import { useAvailableClaudeModels } from '../../../hooks/providers/useAvailableClaudeModels';
 import type { AiFeatureConfig, AiFeatureProvider } from '../../../types/aiFeatureConfig';
 import styles from './style.module.less';
 
@@ -19,7 +19,7 @@ const AiFeatureProviderModelPanel = ({
   config,
   settingsKeyPrefix,
   providerKeyPrefix,
-  fallbackProvider = 'codex',
+  fallbackProvider = 'claude',
   onProviderChange = () => {},
   onModelChange = () => {},
   onResetToDefault = () => {},
@@ -30,7 +30,7 @@ const AiFeatureProviderModelPanel = ({
     ?? config.effectiveProvider
     ?? fallbackProvider;
   const statusProvider = config.effectiveProvider ?? config.provider ?? fallbackProvider;
-  const modelOptions = selectedProvider === 'codex' ? CODEX_MODELS : CLAUDE_MODELS;
+  const modelOptions = useAvailableClaudeModels();
   const isAutoMode = config.provider == null;
   const statusText = config.resolutionSource === 'auto'
     ? t(`${settingsKeyPrefix}.currentProviderAuto`, {
@@ -61,7 +61,7 @@ const AiFeatureProviderModelPanel = ({
             onChange={(e) => onProviderChange(e.target.value as AiFeatureProvider)}
             aria-label={t(`${settingsKeyPrefix}.label`)}
           >
-            {(['claude', 'codex'] as AiFeatureProvider[]).map((provider) => (
+            {(['claude'] as AiFeatureProvider[]).map((provider) => (
               <option key={provider} value={provider} disabled={!config.availability[provider]}>
                 {getProviderLabel(provider)}{!config.availability[provider] ? ` (${t(`${settingsKeyPrefix}.providerUnavailable`)})` : ''}
               </option>

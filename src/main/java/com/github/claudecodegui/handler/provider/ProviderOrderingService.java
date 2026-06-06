@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Handles provider ordering/sorting operations for both Claude and Codex providers.
+ * Handles provider ordering/sorting operations for Claude providers.
  */
 public class ProviderOrderingService {
 
@@ -22,12 +22,10 @@ public class ProviderOrderingService {
 
     private final HandlerContext context;
     private final ClaudeProviderOperations claudeOps;
-    private final CodexProviderOperations codexOps;
 
-    public ProviderOrderingService(HandlerContext context, ClaudeProviderOperations claudeOps, CodexProviderOperations codexOps) {
+    public ProviderOrderingService(HandlerContext context, ClaudeProviderOperations claudeOps) {
         this.context = context;
         this.claudeOps = claudeOps;
-        this.codexOps = codexOps;
     }
 
     /**
@@ -42,23 +40,6 @@ public class ProviderOrderingService {
             ApplicationManager.getApplication().invokeLater(claudeOps::handleGetProviders);
         } catch (Exception e) {
             LOG.error("[ProviderHandler] Failed to save provider order: " + e.getMessage(), e);
-            ApplicationManager.getApplication().invokeLater(() ->
-                context.callJavaScript("window.showError", context.escapeJs("Failed to save provider order: " + e.getMessage())));
-        }
-    }
-
-    /**
-     * Save Codex provider order after drag-and-drop sorting.
-     */
-    public void handleSortCodexProviders(String content) {
-        List<String> orderedIds = parseOrderedIds(content, "Codex sorting");
-        if (orderedIds == null) { return; }
-        try {
-            context.getSettingsService().saveCodexProviderOrder(orderedIds);
-            LOG.info("[ProviderHandler] Saved Codex provider order: " + orderedIds);
-            ApplicationManager.getApplication().invokeLater(codexOps::handleGetCodexProviders);
-        } catch (Exception e) {
-            LOG.error("[ProviderHandler] Failed to save Codex provider order: " + e.getMessage(), e);
             ApplicationManager.getApplication().invokeLater(() ->
                 context.callJavaScript("window.showError", context.escapeJs("Failed to save provider order: " + e.getMessage())));
         }

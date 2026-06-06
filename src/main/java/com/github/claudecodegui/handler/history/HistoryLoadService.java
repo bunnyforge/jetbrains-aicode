@@ -6,7 +6,6 @@ import com.github.claudecodegui.handler.core.HandlerContext;
 import com.github.claudecodegui.cache.SessionIndexCache;
 import com.github.claudecodegui.cache.SessionIndexManager;
 import com.github.claudecodegui.provider.claude.ClaudeHistoryReader;
-import com.github.claudecodegui.provider.codex.CodexHistoryReader;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -36,8 +35,6 @@ class HistoryLoadService {
 
     /**
      * Load and inject history data into the frontend (including favorite info).
-     *
-     * @param provider the provider identifier ("claude" or "codex")
      */
     void handleLoadHistoryData(String provider) {
         CompletableFuture.runAsync(() -> {
@@ -53,19 +50,10 @@ class HistoryLoadService {
                     return;
                 }
 
-                // Choose a different reader based on the provider
-                if ("codex".equals(provider)) {
-                    // Use CodexHistoryReader to read Codex sessions (filtered by project)
-                    LOG.info("[HistoryHandler] 使用 CodexHistoryReader 读取 Codex 会话 (项目: " + projectPath + ")");
-                    CodexHistoryReader codexReader = new CodexHistoryReader();
-                    historyJson = codexReader.getSessionsForProjectAsJson(projectPath);
-                    LOG.info("[HistoryHandler] CodexHistoryReader 返回的 JSON 长度: " + historyJson.length());
-                } else {
-                    // Default: use ClaudeHistoryReader to read Claude sessions
-                    LOG.info("[HistoryHandler] 使用 ClaudeHistoryReader 读取 Claude 会话");
-                    ClaudeHistoryReader historyReader = new ClaudeHistoryReader();
-                    historyJson = historyReader.getProjectDataAsJson(projectPath);
-                }
+                // Default: use ClaudeHistoryReader to read Claude sessions
+                LOG.info("[HistoryHandler] 使用 ClaudeHistoryReader 读取 Claude 会话");
+                ClaudeHistoryReader historyReader = new ClaudeHistoryReader();
+                historyJson = historyReader.getProjectDataAsJson(projectPath);
 
                 // Load favorite data and merge into history data
                 String enhancedJson = enhanceHistoryWithFavorites(historyJson, provider);

@@ -18,29 +18,15 @@ public class SessionSendServiceTest {
     public void resolveEffectivePermissionModePrefersRequestedModeWhenValid() {
         assertEquals(
                 "acceptEdits",
-                SessionSendService.resolveEffectivePermissionMode("claude", "acceptEdits", "default")
+                SessionSendService.resolveEffectivePermissionMode("claude", "acceptEdits")
         );
     }
 
     @Test
-    public void resolveEffectivePermissionModeFallsBackToSessionModeAndDowngradesCodexPlan() {
+    public void resolveEffectivePermissionModeFallsBackToDefaultWhenNoRequestedOrSessionMode() {
         assertEquals(
                 "default",
-                SessionSendService.resolveEffectivePermissionMode("codex", null, "plan")
+                SessionSendService.resolveEffectivePermissionMode("claude", null)
         );
-        assertEquals(
-                "default",
-                SessionSendService.resolveEffectivePermissionMode("claude", null, null)
-        );
-    }
-
-    @Test
-    public void getCodexRuntimeAccessErrorRequiresAuthorizationOrManagedProvider() {
-        assertEquals(
-                "Codex local configuration access is not authorized. Please authorize local ~/.codex access or enable a managed Codex provider first.",
-                SessionSendService.getCodexRuntimeAccessError("inactive")
-        );
-        assertNull(SessionSendService.getCodexRuntimeAccessError("managed"));
-        assertNull(SessionSendService.getCodexRuntimeAccessError("cli_login"));
     }
 }

@@ -1,31 +1,17 @@
 /**
  * Permission Mapping Utility
  *
- * Maps unified permission concepts across different AI providers.
- * Each provider has its own permission model - this module provides
- * bidirectional translation between unified and provider-specific formats.
+ * Maps unified permission concepts to the Claude provider format.
  *
  * Philosophy: "Simple is better than complex" - Zen of Python
  *
  * @author Inspired by Steve Jobs' pursuit of simplicity
  */
 
-import { platform } from 'os';
-
-/**
- * Check if running on Windows platform
- * Windows sandbox support is experimental, so we use danger-full-access mode
- * @returns {boolean}
- */
-function isWindows() {
-  return platform() === 'win32';
-}
-
 /**
  * Unified Permission Modes
  *
  * These are the canonical permission levels understood by the IDEA plugin.
- * All providers must map their native permissions to these modes.
  */
 export const UnifiedPermissionMode = {
   /** Default: Ask user before dangerous operations */
@@ -109,125 +95,21 @@ export class ClaudePermissionMapper {
 }
 
 /**
- * Codex Permission Mapping
- *
- * Codex uses a different permission model based on:
- * - skipGitRepoCheck: boolean (safety check bypass)
- * - sandbox: 'read-only' | 'workspace-write' | 'danger-full-access'
- *
- * We map these to our unified modes.
- *
- * NOTE: Windows sandbox support is experimental, so we use danger-full-access
- * mode on Windows to ensure write operations work correctly.
- */
-export class CodexPermissionMapper {
-  /**
-   * Convert unified permission mode to Codex configuration
-   * @param {string} unifiedMode - One of UnifiedPermissionMode values
-   * @returns {{skipGitRepoCheck: boolean, sandbox?: string}} Codex permission config
-   */
-  static toProvider(unifiedMode) {
-    const { core, alias } = normalizeUnifiedMode(unifiedMode);
-
-    // Check if running on Windows - sandbox is experimental on Windows
-    const onWindows = isWindows();
-
-    // Treat bypassPermissions (Full Auto / trusted) as workspace-write but completely auto-approved.
-    // On Windows, use danger-full-access since sandbox is experimental
-    if (alias === 'bypassPermissions') {
-      return {
-        skipGitRepoCheck: true,
-        sandbox: onWindows ? 'danger-full-access' : 'workspace-write',
-        approvalPolicy: 'never'
-      };
-    }
-
-    // acceptEdits (Agent Mode): reduce approvals compared with default, while keeping safety checks
-    // On Windows, use danger-full-access since sandbox is experimental
-    if (alias === 'acceptEdits') {
-      return {
-        skipGitRepoCheck: true,
-        sandbox: onWindows ? 'danger-full-access' : 'workspace-write',
-        approvalPolicy: 'on-request'
-      };
-    }
-
-    switch (core) {
-      case UnifiedPermissionMode.SANDBOX:
-        // Sandbox: Read-only mode (always prompt when attempting to write)
-        return {
-          skipGitRepoCheck: true,
-          sandbox: 'read-only',
-          approvalPolicy: 'untrusted'
-        };
-
-      case UnifiedPermissionMode.YOLO:
-        // YOLO: Full access, no restrictions (explicit yolo selection)
-        return {
-          skipGitRepoCheck: true,
-          sandbox: 'danger-full-access',
-          approvalPolicy: 'never'
-        };
-
-      case UnifiedPermissionMode.DEFAULT:
-      default:
-        // Default: Allow workspace writes but still prompt before executing risky actions
-        // On Windows, use danger-full-access since sandbox is experimental
-        return {
-          skipGitRepoCheck: true,
-          sandbox: onWindows ? 'danger-full-access' : 'workspace-write',
-          approvalPolicy: 'untrusted'
-        };
-    }
-  }
-
-  /**
-   * Convert Codex configuration to unified permission mode
-   * @param {{skipGitRepoCheck?: boolean, sandbox?: string}} codexConfig
-   * @returns {string} Unified permission mode
-   */
-  static fromProvider(codexConfig) {
-    if (!codexConfig || !codexConfig.sandbox) {
-      return UnifiedPermissionMode.DEFAULT;
-    }
-
-    switch (codexConfig.sandbox) {
-      case 'read-only':
-        return UnifiedPermissionMode.SANDBOX;
-      case 'danger-full-access':
-        return UnifiedPermissionMode.YOLO;
-      case 'workspace-write':
-      default:
-        return UnifiedPermissionMode.DEFAULT;
-    }
-  }
-}
-
-/**
  * Permission Mapper Factory
  *
- * Automatically selects the correct mapper based on provider type.
+ * Selects the correct mapper based on provider type.
  * This is the main entry point for permission translation.
- *
- * Usage:
- *   const mapper = PermissionMapperFactory.getMapper('codex');
- *   const providerConfig = mapper.toProvider('yolo');
  */
 export class PermissionMapperFactory {
   /**
    * Get permission mapper for a specific provider
-   * @param {'claude'|'codex'|'gemini'} provider
-   * @returns {ClaudePermissionMapper|CodexPermissionMapper}
+   * @param {'claude'} provider
+   * @returns {ClaudePermissionMapper}
    */
   static getMapper(provider) {
     switch (provider) {
       case 'claude':
         return ClaudePermissionMapper;
-      case 'codex':
-        return CodexPermissionMapper;
-      case 'gemini':
-        // TODO: Implement GeminiPermissionMapper when adding Gemini support
-        throw new Error('Gemini permission mapping not yet implemented');
       default:
         throw new Error(`Unknown provider: ${provider}`);
     }
@@ -235,7 +117,7 @@ export class PermissionMapperFactory {
 
   /**
    * Quick conversion: unified → provider-specific
-   * @param {'claude'|'codex'|'gemini'} provider
+   * @param {'claude'} provider
    * @param {string} unifiedMode
    * @returns {string|object} Provider-specific permission config
    */
@@ -246,7 +128,7 @@ export class PermissionMapperFactory {
 
   /**
    * Quick conversion: provider-specific → unified
-   * @param {'claude'|'codex'|'gemini'} provider
+   * @param {'claude'} provider
    * @param {string|object} providerConfig
    * @returns {string} Unified permission mode
    */

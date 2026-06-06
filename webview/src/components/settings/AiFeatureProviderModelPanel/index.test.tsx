@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import AiFeatureProviderModelPanel from './index';
+import { CLAUDE_MODELS } from '../../ChatInputBox/types';
+import { STORAGE_KEYS } from '../../../types/provider';
 import type { CommitAiConfig } from '../../../types/aiFeatureConfig';
 
 const panelStyles = readFileSync(
@@ -20,17 +22,25 @@ vi.mock('react-i18next', () => ({
 describe('AiFeatureProviderModelPanel', () => {
   const config: CommitAiConfig = {
     provider: null,
-    effectiveProvider: 'codex',
+    effectiveProvider: 'claude',
     resolutionSource: 'auto',
     models: {
       claude: 'claude-sonnet-4-6',
-      codex: 'gpt-5.5',
     },
     availability: {
       claude: true,
-      codex: true,
     },
   };
+
+  beforeEach(() => {
+    localStorage.removeItem(STORAGE_KEYS.CLAUDE_CUSTOM_MODELS);
+    localStorage.removeItem(STORAGE_KEYS.CLAUDE_MODEL_MAPPING);
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(STORAGE_KEYS.CLAUDE_CUSTOM_MODELS);
+    localStorage.removeItem(STORAGE_KEYS.CLAUDE_MODEL_MAPPING);
+  });
 
   it('renders provider select, model select, status hint, and reset button', () => {
     render(
@@ -44,7 +54,7 @@ describe('AiFeatureProviderModelPanel', () => {
       />
     );
 
-    expect(screen.getByText('settings.commit.providerModel.currentProviderAuto:settings.basic.promptEnhancer.provider.codex')).toBeTruthy();
+    expect(screen.getByText('settings.commit.providerModel.currentProviderAuto:settings.basic.promptEnhancer.provider.claude')).toBeTruthy();
     expect(screen.getByTestId('provider-select-icon')).toBeTruthy();
     expect(screen.getByTestId('ai-feature-actions-row')).toBeTruthy();
     expect(screen.getByTestId('ai-feature-status-hint')).toBeTruthy();
@@ -67,8 +77,26 @@ describe('AiFeatureProviderModelPanel', () => {
     );
   });
 
-  it('calls provider and reset callbacks', () => {
-    const onProviderChange = vi.fn();
+  it('lists built-in Claude models in the model selector', () => {
+    render(
+      <AiFeatureProviderModelPanel
+        config={config}
+        settingsKeyPrefix="settings.commit.providerModel"
+        providerKeyPrefix="settings.basic.promptEnhancer.provider"
+        onProviderChange={vi.fn()}
+        onModelChange={vi.fn()}
+        onResetToDefault={vi.fn()}
+      />
+    );
+
+    const [, modelSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    const optionValues = Array.from(modelSelect.options).map((o) => o.value);
+    for (const model of CLAUDE_MODELS) {
+      expect(optionValues).toContain(model.id);
+    }
+  });
+
+  it('invokes the reset callback', () => {
     const onResetToDefault = vi.fn();
 
     render(
@@ -81,22 +109,20 @@ describe('AiFeatureProviderModelPanel', () => {
         }}
         settingsKeyPrefix="settings.commit.providerModel"
         providerKeyPrefix="settings.basic.promptEnhancer.provider"
-        onProviderChange={onProviderChange}
+        onProviderChange={vi.fn()}
         onModelChange={vi.fn()}
         onResetToDefault={onResetToDefault}
       />
     );
 
-    const [providerSelect] = screen.getAllByRole('combobox');
-    fireEvent.change(providerSelect, { target: { value: 'codex' } });
     fireEvent.click(screen.getByRole('button', { name: 'settings.commit.providerModel.resetToDefault' }));
 
-    expect(onProviderChange).toHaveBeenCalledWith('codex');
     expect(onResetToDefault).toHaveBeenCalledTimes(1);
   });
 
-  it('calls model change callback from model selector', () => {
+  it('calls model change callback when a model is selected', () => {
     const onModelChange = vi.fn();
+    const targetModel = CLAUDE_MODELS[2].id;
 
     render(
       <AiFeatureProviderModelPanel
@@ -109,9 +135,68 @@ describe('AiFeatureProviderModelPanel', () => {
       />
     );
 
-    const [, modelSelect] = screen.getAllByRole('combobox');
-    fireEvent.change(modelSelect, { target: { value: 'gpt-5.4' } });
+    const [, modelSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(modelSelect, { target: { value: targetModel } });
 
-    expect(onModelChange).toHaveBeenCalledWith('gpt-5.4');
+    expect(onModelChange).toHaveBeenCalledWith(targetModel);
+  });
+
+  it('includes user-defined custom models in the selector and lists them before built-ins', () => {
+    const customId = 'deepseek/deepseek-v4-flash';
+    localStorage.setItem(
+      STORAGE_KEYS.CLAUDE_CUSTOM_MODELS,
+      JSON.stringify([{ id: customId, label: customId, description: 'Custom' }])
+    );
+
+    render(
+      <AiFeatureProviderModelPanel
+        config={config}
+        settingsKeyPrefix="settings.commit.providerModel"
+        providerKeyPrefix="settings.basic.promptEnhancer.provider"
+        onProviderChange={vi.fn()}
+        onModelChange={vi.fn()}
+        onResetToDefault={vi.fn()}
+      />
+    );
+
+    const [, modelSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    const optionValues = Array.from(modelSelect.options).map((o) => o.value);
+    expect(optionValues[0]).toBe(customId);
+    expect(optionValues).toContain(CLAUDE_MODELS[0].id);
+  });
+
+  it('applies model mapping to every built-in Claude model including opus-4-6', () => {
+    const mappedLabel = 'deepseek/deepseek-v4-flash';
+    // Same shape as useProviderSettings.syncActiveProviderModelMapping:
+    // main/sonnet/opus/haiku read from ANTHROPIC_* env vars.
+    localStorage.setItem(
+      STORAGE_KEYS.CLAUDE_MODEL_MAPPING,
+      JSON.stringify({
+        main: '',
+        sonnet: mappedLabel,
+        opus: mappedLabel,
+        haiku: mappedLabel,
+      })
+    );
+
+    render(
+      <AiFeatureProviderModelPanel
+        config={config}
+        settingsKeyPrefix="settings.commit.providerModel"
+        providerKeyPrefix="settings.basic.promptEnhancer.provider"
+        onProviderChange={vi.fn()}
+        onModelChange={vi.fn()}
+        onResetToDefault={vi.fn()}
+      />
+    );
+
+    const [, modelSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    const optionLabels = Array.from(modelSelect.options).map((o) => o.text);
+    // All built-in models should be remapped to the custom label, including opus-4-6.
+    for (const model of CLAUDE_MODELS) {
+      expect(optionLabels).toContain(mappedLabel);
+    }
+    // The original "Opus 4.6" label must NOT appear (it was the bug).
+    expect(optionLabels).not.toContain('Opus 4.6');
   });
 });

@@ -20,9 +20,7 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
     setUsageMaxTokens,
     setPermissionMode,
     setClaudePermissionMode,
-    setCodexPermissionMode,
     setSelectedClaudeModel,
-    setSelectedCodexModel,
     setProviderConfigVersion,
     setActiveProviderConfig,
     setClaudeSettingsAlwaysThinkingEnabled,
@@ -30,7 +28,6 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
     setSendShortcut,
     setAutoOpenFileEnabled,
     setPermissionDialogTimeoutSeconds,
-    currentProviderRef,
     syncActiveProviderModelMapping,
   } = options;
 
@@ -38,18 +35,14 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
     try {
       const data = JSON.parse(json);
       if (typeof data.percentage === 'number') {
-        const used =
-          typeof data.usedTokens === 'number'
-            ? data.usedTokens
-            : typeof data.totalTokens === 'number'
-              ? data.totalTokens
-              : undefined;
-        const max =
-          typeof data.maxTokens === 'number'
-            ? data.maxTokens
-            : typeof data.limit === 'number'
-              ? data.limit
-              : undefined;
+        // Trust the backend's authoritative used/max token counts. Do NOT
+        // fall back to `limit` (per-minute rate limit, not context window)
+        // or `totalTokens` (which has a different semantic in the dashboard
+        // payload and would inflate the displayed used count). If the
+        // canonical field is missing, leave the value as undefined so the
+        // UI can show a placeholder instead of fabricating a wrong number.
+        const used = typeof data.usedTokens === 'number' ? data.usedTokens : undefined;
+        const max = typeof data.maxTokens === 'number' ? data.maxTokens : undefined;
 
         if (used !== undefined && max !== undefined && used > max * 2) {
           console.warn(
@@ -57,8 +50,22 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
           );
         }
 
-        const safePercentage = Math.max(0, Math.min(100, data.percentage));
-        setUsagePercentage(safePercentage);
+        // Internal consistency check: the backend's `percentage` should
+        // match `used / max * 100`. If they disagree by more than 1%, log a
+        // warning so the discrepancy is visible during development. The
+        // token indicator clamps the ring to [0, 100] but shows the
+        // unclamped value in the tooltip so overflow is still visible.
+        if (used !== undefined && max !== undefined && max > 0) {
+          const recomputed = (used / max) * 100;
+          if (Math.abs(recomputed - data.percentage) > 1) {
+            console.warn(
+              `[Frontend] Usage percentage mismatch: backend=${data.percentage}% ` +
+              `recomputed=${recomputed.toFixed(2)}% (used=${used}, max=${max})`,
+            );
+          }
+        }
+
+        setUsagePercentage(data.percentage);
         setUsageUsedTokens(used);
         setUsageMaxTokens(max);
       }
@@ -67,17 +74,10 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
     }
   };
 
-  const updateMode = (mode?: PermissionMode, providerOverride?: string) => {
-    const activeProvider = providerOverride || currentProviderRef.current;
+  const updateMode = (mode?: PermissionMode) => {
     if (isValidPermissionMode(mode)) {
-      const nextMode: PermissionMode =
-        activeProvider === 'codex' && mode === 'plan' ? 'default' : mode;
-      setPermissionMode((prev) => (prev === nextMode ? prev : nextMode));
-      if (activeProvider === 'codex') {
-        setCodexPermissionMode((prev) => (prev === nextMode ? prev : nextMode));
-      } else {
-        setClaudePermissionMode((prev) => (prev === nextMode ? prev : nextMode));
-      }
+      setPermissionMode((prev: PermissionMode) => (prev === mode ? prev : mode));
+      setClaudePermissionMode((prev: PermissionMode) => (prev === mode ? prev : mode));
     }
   };
 
@@ -85,20 +85,11 @@ export function registerUsageModeCallbacks(options: UseWindowCallbacksOptions): 
   window.onModeReceived = (mode) => updateMode(mode as PermissionMode);
 
   window.onModelChanged = (modelId) => {
-    const provider = currentProviderRef.current;
-    if (provider === 'claude') {
-      setSelectedClaudeModel(normalizeClaudeModelId(modelId));
-    } else if (provider === 'codex') {
-      setSelectedCodexModel(modelId);
-    }
+    setSelectedClaudeModel(normalizeClaudeModelId(modelId));
   };
 
-  window.onModelConfirmed = (modelId, provider) => {
-    if (provider === 'claude') {
-      setSelectedClaudeModel(normalizeClaudeModelId(modelId));
-    } else if (provider === 'codex') {
-      setSelectedCodexModel(modelId);
-    }
+  window.onModelConfirmed = (modelId) => {
+    setSelectedClaudeModel(normalizeClaudeModelId(modelId));
   };
 
   window.updateActiveProvider = (jsonStr: string) => {

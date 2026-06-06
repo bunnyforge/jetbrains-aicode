@@ -1,18 +1,13 @@
 // hooks/useSettingsWindowCallbacks.ts
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProviderConfig, CodexProviderConfig } from '../../../types/provider';
-import type { AgentConfig } from '../../../types/agent';
-import type { PromptConfig } from '../../../types/prompt';
+import type { ProviderConfig } from '../../../types/provider';
 import type { CommitAiConfig } from '../../../types/aiFeatureConfig';
 import type { UiFontConfig, CodeFontConfig } from './useSettingsBasicActions';
-import type { PromptEnhancerConfig } from '../../../types/promptEnhancer';
 import type { AlertType } from '../../AlertDialog';
 import type { ToastMessage } from '../../Toast';
 import {
-  subscribeActiveCodexProvider,
   subscribeActiveProvider,
-  subscribeCodexProviderList,
   subscribeProviderList,
 } from '../../../utils/runtimeProviderCapabilities';
 
@@ -35,7 +30,6 @@ export interface SettingsWindowCallbacksDeps {
   setCommitPrompt: (prompt: string) => void;
   setSavingCommitPrompt: (saving: boolean) => void;
   setCommitAiConfig: (config: CommitAiConfig) => void;
-  setPromptEnhancerConfig: (config: PromptEnhancerConfig) => void;
   setProjectCommitPrompt: (prompt: string) => void;
   setSavingProjectCommitPrompt: (saving: boolean) => void;
   setEditorFontConfig: (config: { fontFamily: string; fontSize: number; lineSpacing: number } | undefined) => void;
@@ -43,11 +37,8 @@ export interface SettingsWindowCallbacksDeps {
   setCodeFontConfig: (config: CodeFontConfig | undefined) => void;
   setIdeTheme: (theme: 'light' | 'dark' | null) => void;
   setLocalStreamingEnabled: (enabled: boolean) => void;
-  setCodexSandboxMode?: (mode: 'workspace-write' | 'danger-full-access') => void;
   setLocalSendShortcut: (shortcut: 'enter' | 'cmdEnter') => void;
   setLoading: (loading: boolean) => void;
-  setCodexLoading: (loading: boolean) => void;
-  setCodexConfigLoading: (loading: boolean) => void;
   // AI feature toggle setters
   setCommitGenerationEnabled?: (enabled: boolean) => void;
   setAiTitleGenerationEnabled?: (enabled: boolean) => void;
@@ -63,24 +54,6 @@ export interface SettingsWindowCallbacksDeps {
   updateProviders: (providers: ProviderConfig[]) => void;
   updateActiveProvider: (provider: ProviderConfig) => void;
   loadProviders: () => void;
-  loadCodexProviders: () => void;
-  loadAgents: () => void;
-  updateAgents: (agents: AgentConfig[]) => void;
-  handleAgentOperationResult: (result: any) => void;
-  handleAgentImportPreviewResult: (previewData: any) => void;
-  handleAgentImportResult: (result: any) => void;
-  updateCodexProviders: (providers: CodexProviderConfig[]) => void;
-  updateActiveCodexProvider: (provider: CodexProviderConfig) => void;
-  updateCurrentCodexConfig: (config: any) => void;
-  cleanupAgentsTimeout: () => void;
-
-  // Prompt-related handlers (optional - now handled by PromptSection component)
-  loadPrompts?: () => void;
-  updatePrompts?: (prompts: PromptConfig[]) => void;
-  handlePromptOperationResult?: (result: any) => void;
-  handlePromptImportPreviewResult?: (previewData: any) => void;
-  handlePromptImportResult?: (result: any) => void;
-  cleanupPromptsTimeout?: () => void;
 
   // Callbacks
   showAlert: (type: AlertType, title: string, message: string) => void;
@@ -248,19 +221,6 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
       };
     }
 
-    // Codex sandbox mode callback
-    window.updateCodexSandboxMode = (jsonStr: string) => {
-      try {
-        const data = JSON.parse(jsonStr);
-        const mode = data?.sandboxMode;
-        if (mode === 'workspace-write' || mode === 'danger-full-access') {
-          d().setCodexSandboxMode?.(mode);
-        }
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse Codex sandbox mode config:', error);
-      }
-    };
-
     // Send shortcut configuration callback
     const previousUpdateSendShortcut = window.updateSendShortcut;
     if (!d().onSendShortcutChangeProp) {
@@ -290,15 +250,6 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
         console.error('[SettingsView] Failed to parse commit prompt:', error);
         d().setSavingCommitPrompt(false);
         d().addToast(t('toast.saveFailed'), 'error');
-      }
-    };
-
-    window.updatePromptEnhancerConfig = (jsonStr: string) => {
-      try {
-        const data = JSON.parse(jsonStr);
-        d().setPromptEnhancerConfig(data);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse prompt enhancer config:', error);
       }
     };
 
@@ -388,130 +339,8 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
       }
     };
 
-    // Agent callbacks
-    const previousUpdateAgents = window.updateAgents;
-    window.updateAgents = (jsonStr: string) => {
-      try {
-        const agentsList: AgentConfig[] = JSON.parse(jsonStr);
-        d().updateAgents(agentsList);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse agents:', error);
-      }
-      previousUpdateAgents?.(jsonStr);
-    };
-
-    window.agentOperationResult = (jsonStr: string) => {
-      try {
-        const result = JSON.parse(jsonStr);
-        d().handleAgentOperationResult(result);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse agent operation result:', error);
-      }
-    };
-
-    window.agentImportPreviewResult = (jsonStr: string) => {
-      try {
-        const previewData = JSON.parse(jsonStr);
-        if (!Array.isArray(previewData?.items) || typeof previewData?.summary !== 'object') {
-          console.error('[SettingsView] Invalid agent import preview data structure');
-          return;
-        }
-        d().handleAgentImportPreviewResult(previewData);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse agent import preview result:', error);
-      }
-    };
-
-    window.agentImportResult = (jsonStr: string) => {
-      try {
-        const result = JSON.parse(jsonStr);
-        d().handleAgentImportResult(result);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse agent import result:', error);
-      }
-    };
-
-    // Prompt library callbacks (legacy support - now primarily handled by PromptSection)
-    const previousUpdatePrompts = window.updatePrompts;
-    window.updatePrompts = (jsonStr: string) => {
-      try {
-        const promptsList: PromptConfig[] = JSON.parse(jsonStr);
-        d().updatePrompts?.(promptsList);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse prompts:', error);
-      }
-      previousUpdatePrompts?.(jsonStr);
-    };
-
-    window.promptOperationResult = (jsonStr: string) => {
-      try {
-        const result = JSON.parse(jsonStr);
-        d().handlePromptOperationResult?.(result);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse prompt operation result:', error);
-      }
-    };
-
-    window.promptImportPreviewResult = (jsonStr: string) => {
-      try {
-        const previewData = JSON.parse(jsonStr);
-        if (!Array.isArray(previewData?.items) || typeof previewData?.summary !== 'object') {
-          console.error('[SettingsView] Invalid prompt import preview data structure');
-          return;
-        }
-        d().handlePromptImportPreviewResult?.(previewData);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse prompt import preview result:', error);
-      }
-    };
-
-    window.promptImportResult = (jsonStr: string) => {
-      try {
-        const result = JSON.parse(jsonStr);
-        d().handlePromptImportResult?.(result);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse prompt import result:', error);
-      }
-    };
-
-    // Codex provider callbacks - subscribe via the registry.
-    const unsubscribeCodexProviders = subscribeCodexProviderList((jsonStr: string) => {
-      try {
-        const providersList: CodexProviderConfig[] = JSON.parse(jsonStr);
-        d().updateCodexProviders(providersList);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse Codex providers:', error);
-        d().setCodexLoading(false);
-      }
-    });
-
-    const unsubscribeActiveCodexProvider = subscribeActiveCodexProvider((jsonStr: string) => {
-      try {
-        const activeProvider: CodexProviderConfig = JSON.parse(jsonStr);
-        if (activeProvider) {
-          d().updateActiveCodexProvider(activeProvider);
-        }
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse active Codex provider:', error);
-      }
-    });
-
-    window.updateCurrentCodexConfig = (jsonStr: string) => {
-      try {
-        const config = JSON.parse(jsonStr);
-        d().updateCurrentCodexConfig(config);
-      } catch (error) {
-        console.error('[SettingsView] Failed to parse Codex config:', error);
-        d().setCodexConfigLoading(false);
-      }
-    };
-
     // Initial data loading
     d().loadProviders();
-    d().loadCodexProviders();
-    d().loadAgents();
-    // Note: loadPrompts is now handled by PromptSection component
-    d().loadPrompts?.();
     sendToJava('get_node_path:');
     sendToJava('get_claude_cli_path:');
     sendToJava('get_working_directory:');
@@ -519,10 +348,8 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
     sendToJava('get_ui_font_config:');
     sendToJava('get_code_font_config:');
     sendToJava('get_streaming_enabled:');
-    sendToJava('get_codex_sandbox_mode:');
     sendToJava('get_commit_prompt:');
     sendToJava('get_commit_ai_config:');
-    sendToJava('get_prompt_enhancer_config:');
     sendToJava('get_sound_notification_config:');
     sendToJava('get_commit_generation_enabled:');
     sendToJava('get_ai_title_generation_enabled:');
@@ -531,13 +358,8 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
     sendToJava('get_permission_dialog_timeout:');
 
     return () => {
-      d().cleanupAgentsTimeout();
-      d().cleanupPromptsTimeout?.();
-
       unsubscribeProviders();
       unsubscribeActiveProvider();
-      unsubscribeCodexProviders();
-      unsubscribeActiveCodexProvider();
       window.showError = undefined;
       window.showSwitchSuccess = undefined;
       window.updateNodePath = undefined;
@@ -552,28 +374,17 @@ export function useSettingsWindowCallbacks(deps: SettingsWindowCallbacksDeps) {
       if (!d().onStreamingEnabledChangeProp) {
         window.updateStreamingEnabled = previousUpdateStreamingEnabled;
       }
-      window.updateCodexSandboxMode = undefined;
       if (!d().onSendShortcutChangeProp) {
         window.updateSendShortcut = previousUpdateSendShortcut;
       }
       window.updateCommitPrompt = undefined;
       window.updateCommitAiConfig = undefined;
-      window.updatePromptEnhancerConfig = undefined;
       window.updateProjectCommitPrompt = undefined;
       window.updateSoundNotificationConfig = undefined;
       window.updateCommitGenerationEnabled = undefined;
       window.updateAiTitleGenerationEnabled = undefined;
       window.updateStatusBarWidgetEnabled = undefined;
       window.updateTaskCompletionNotificationEnabled = undefined;
-      window.updateAgents = previousUpdateAgents;
-      window.agentOperationResult = undefined;
-      window.agentImportPreviewResult = undefined;
-      window.agentImportResult = undefined;
-      window.updatePrompts = previousUpdatePrompts;
-      window.promptOperationResult = undefined;
-      window.promptImportPreviewResult = undefined;
-      window.promptImportResult = undefined;
-      window.updateCurrentCodexConfig = undefined;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);

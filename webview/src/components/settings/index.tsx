@@ -1,6 +1,4 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CodexProviderConfig } from '../../types/provider';
 import { ToastContainer } from '../Toast';
 
 // Import split-out components
@@ -11,12 +9,8 @@ import ProviderTabSection from './ProviderTabSection';
 import DependencySection from './DependencySection';
 import UsageSection from './UsageSection';
 import PlaceholderSection from './PlaceholderSection';
-import PermissionsSection from './PermissionsSection';
 import CommunitySection from './CommunitySection';
-import AgentSection from './AgentSection';
-import PromptSection from './PromptSection';
 import CommitSection from './CommitSection';
-import PromptEnhancerSection from './PromptEnhancerSection';
 import OtherSettingsSection from './OtherSettingsSection';
 import { SkillsSettingsSection } from '../skills';
 import SettingsDialogs from './SettingsDialogs';
@@ -25,8 +19,6 @@ import { setNewSessionConfirmEnabled as persistNewSessionConfirmEnabled } from '
 // Import custom hooks
 import {
   useProviderManagement,
-  useCodexProviderManagement,
-  useAgentManagement,
   useSettingsWindowCallbacks,
   useSettingsPageState,
   useSettingsThemeSync,
@@ -70,12 +62,6 @@ const SettingsView = ({
   onPermissionDialogTimeoutChange: onPermissionDialogTimeoutChangeProp,
 }: SettingsViewProps) => {
   const { t } = useTranslation();
-  const isCodexMode = currentProvider === 'codex';
-  // Codex mode: align with Claude capabilities for settings tabs
-  const disabledTabs = useMemo<SettingsTab[]>(
-    () => [],
-    [isCodexMode]
-  );
 
   // Page state: tabs, toasts, sidebar collapse, alert dialog
   const {
@@ -89,7 +75,7 @@ const SettingsView = ({
     closeAlert,
     addToast,
     dismissToast,
-  } = useSettingsPageState({ initialTab, isCodexMode, disabledTabs });
+  } = useSettingsPageState({ initialTab });
 
   // Theme sync: theme preference, IDE theme, font size, chat colors
   const {
@@ -132,13 +118,9 @@ const SettingsView = ({
     setCodeFontConfig,
     setLocalStreamingEnabled,
     streamingEnabled,
-    codexSandboxMode,
-    setCodexSandboxMode,
     setLocalSendShortcut,
     sendShortcut,
     autoOpenFileEnabled,
-    promptEnhancerConfig,
-    setPromptEnhancerConfig,
     commitPrompt,
     setCommitPrompt,
     savingCommitPrompt,
@@ -167,7 +149,6 @@ const SettingsView = ({
     handleSaveCodeFontCustomPath,
     handleBrowseCodeFontFile,
     handleStreamingEnabledChange,
-    handleCodexSandboxModeChange,
     handleSendShortcutChange,
     handleAutoOpenFileEnabledChange,
     handleSoundNotificationEnabledChange,
@@ -202,9 +183,6 @@ const SettingsView = ({
     handleCommitAiProviderChange,
     handleCommitAiModelChange,
     handleCommitAiResetToDefault,
-    handlePromptEnhancerProviderChange,
-    handlePromptEnhancerModelChange,
-    handlePromptEnhancerResetToDefault,
   } = useSettingsBasicActions({
     streamingEnabledProp,
     onStreamingEnabledChangeProp,
@@ -239,62 +217,6 @@ const SettingsView = ({
     onSuccess: (msg) => addToast(msg, 'success'),
   });
 
-  // Use Codex provider management hook
-  const {
-    codexProviders,
-    codexLoading,
-    codexProviderDialog,
-    deleteCodexConfirm,
-    loadCodexProviders,
-    updateCodexProviders,
-    updateActiveCodexProvider,
-    updateCurrentCodexConfig,
-    handleAddCodexProvider,
-    handleEditCodexProvider,
-    handleCloseCodexProviderDialog,
-    handleSaveCodexProvider,
-    handleSwitchCodexProvider,
-    handleRevokeCodexLocalConfigAuthorization,
-    handleDeleteCodexProvider,
-    confirmDeleteCodexProvider,
-    cancelDeleteCodexProvider,
-    setCodexLoading,
-    setCodexConfigLoading,
-  } = useCodexProviderManagement({
-    onSuccess: (msg) => addToast(msg, 'success'),
-  });
-
-  // Use agent management hook
-  const {
-    agents,
-    agentsLoading,
-    agentDialog,
-    deleteAgentConfirm,
-    importPreviewDialog: agentImportPreviewDialog,
-    exportDialog: agentExportDialog,
-    loadAgents,
-    updateAgents,
-    cleanupAgentsTimeout,
-    handleAddAgent,
-    handleEditAgent,
-    handleCloseAgentDialog,
-    handleDeleteAgent,
-    handleSaveAgent,
-    confirmDeleteAgent,
-    cancelDeleteAgent,
-    handleAgentOperationResult,
-    handleExportAgents,
-    handleCloseExportDialog: handleCloseAgentExportDialog,
-    handleConfirmExport: handleConfirmAgentExport,
-    handleImportAgentsFile,
-    handleAgentImportPreviewResult,
-    handleCloseImportPreview: handleCloseAgentImportPreview,
-    handleSaveImportedAgents,
-    handleAgentImportResult,
-  } = useAgentManagement({
-    onSuccess: (msg) => addToast(msg, 'success'),
-  });
-
   // Note: Prompt management is now handled internally by PromptSection component
 
   // Register window callbacks for Java bridge communication
@@ -310,7 +232,6 @@ const SettingsView = ({
     setCommitPrompt,
     setSavingCommitPrompt,
     setCommitAiConfig,
-    setPromptEnhancerConfig,
     setProjectCommitPrompt,
     setSavingProjectCommitPrompt,
     setEditorFontConfig,
@@ -318,25 +239,12 @@ const SettingsView = ({
     setCodeFontConfig,
     setIdeTheme,
     setLocalStreamingEnabled,
-    setCodexSandboxMode,
     setLocalSendShortcut,
     setLoading,
-    setCodexLoading,
-    setCodexConfigLoading,
     updateProviders,
     updateActiveProvider,
     loadProviders,
-    loadCodexProviders,
-    loadAgents,
-    updateAgents,
-    handleAgentOperationResult,
-    handleAgentImportPreviewResult,
-    handleAgentImportResult,
     // Note: Prompt-related callbacks are now handled in PromptSection component
-    updateCodexProviders,
-    updateActiveCodexProvider,
-    updateCurrentCodexConfig,
-    cleanupAgentsTimeout,
     showAlert,
     addToast,
     onStreamingEnabledChangeProp,
@@ -424,16 +332,6 @@ const SettingsView = ({
     setLoading(true);
   };
 
-  // Save Codex provider (wrapper function with validation logic)
-  const handleSaveCodexProviderFromDialog = (providerData: CodexProviderConfig) => {
-    handleSaveCodexProvider(providerData);
-  };
-
-  // Save agent (wrapper function with validation logic)
-  const handleSaveAgentFromDialog = (data: { name: string; prompt: string }) => {
-    handleSaveAgent(data);
-  };
-
   return (
     <div className={styles.settingsPage}>
       {/* Top header bar */}
@@ -447,8 +345,6 @@ const SettingsView = ({
           onTabChange={handleTabChange}
           isCollapsed={isCollapsed}
           onToggleCollapse={toggleManualCollapse}
-          disabledTabs={disabledTabs}
-          onDisabledTabClick={() => addToast(t('settings.codexFeatureUnavailable'), 'warning')}
         />
 
         {/* Content area */}
@@ -535,7 +431,7 @@ const SettingsView = ({
             />
           </div>
 
-          {/* Provider management (Claude + Codex internal tab switching) */}
+          {/* Provider management */}
           <div style={currentTab === 'providers' ? BLOCK_STYLE : NONE_STYLE}>
             <ProviderTabSection
               currentProvider={currentProvider}
@@ -545,15 +441,8 @@ const SettingsView = ({
               onEditProvider={handleEditProvider}
               onDeleteProvider={handleDeleteProvider}
               onSwitchProvider={handleSwitchProvider}
-              codexProviders={codexProviders}
-              codexLoading={codexLoading}
-              onAddCodexProvider={handleAddCodexProvider}
-                onEditCodexProvider={handleEditCodexProvider}
-                onDeleteCodexProvider={handleDeleteCodexProvider}
-                onSwitchCodexProvider={handleSwitchCodexProvider}
-                onRevokeCodexLocalConfigAuthorization={handleRevokeCodexLocalConfigAuthorization}
-                addToast={addToast}
-              />
+              addToast={addToast}
+            />
           </div>
 
           {/* SDK dependency management */}
@@ -561,36 +450,9 @@ const SettingsView = ({
             <DependencySection addToast={addToast} isActive={currentTab === 'dependencies'} />
           </div>
 
-          {/* Usage statistics */}
-          <div style={currentTab === 'usage' ? BLOCK_STYLE : NONE_STYLE}>
-            <UsageSection currentProvider={currentProvider} />
-          </div>
-
           {/* MCP servers */}
           <div style={currentTab === 'mcp' ? BLOCK_STYLE : NONE_STYLE}>
             <PlaceholderSection type="mcp" currentProvider={currentProvider} />
-          </div>
-
-          {/* Permissions configuration */}
-          <div style={currentTab === 'permissions' ? BLOCK_STYLE : NONE_STYLE}>
-            {currentProvider === 'codex' ? (
-              <PermissionsSection
-                codexSandboxMode={codexSandboxMode}
-                onCodexSandboxModeChange={handleCodexSandboxModeChange}
-              />
-            ) : (
-              <PlaceholderSection type="permissions" />
-            )}
-          </div>
-
-          {/* Prompt enhancer configuration */}
-          <div style={currentTab === 'promptEnhancer' ? BLOCK_STYLE : NONE_STYLE}>
-            <PromptEnhancerSection
-              promptEnhancerConfig={promptEnhancerConfig}
-              onPromptEnhancerProviderChange={handlePromptEnhancerProviderChange}
-              onPromptEnhancerModelChange={handlePromptEnhancerModelChange}
-              onPromptEnhancerResetToDefault={handlePromptEnhancerResetToDefault}
-            />
           </div>
 
           {/* Commit AI configuration */}
@@ -611,24 +473,9 @@ const SettingsView = ({
             />
           </div>
 
-          {/* Agents */}
-          <div style={currentTab === 'agents' ? BLOCK_STYLE : NONE_STYLE}>
-            <AgentSection
-              agents={agents}
-              loading={agentsLoading}
-              onAdd={handleAddAgent}
-              onEdit={handleEditAgent}
-              onDelete={handleDeleteAgent}
-              onExport={handleExportAgents}
-              onImport={handleImportAgentsFile}
-            />
-          </div>
-
-          {/* Prompts */}
-          <div style={currentTab === 'prompts' ? BLOCK_STYLE : NONE_STYLE}>
-            <PromptSection
-              onSuccess={(msg) => addToast(msg, 'success')}
-            />
+          {/* Usage / cost statistics */}
+          <div style={currentTab === 'usage' ? BLOCK_STYLE : NONE_STYLE}>
+            <UsageSection currentProvider={currentProvider} />
           </div>
 
           {/* Skills */}
@@ -656,7 +503,7 @@ const SettingsView = ({
         </div>
       </div>
 
-      {/* All dialogs (alert, confirm, provider, agent, prompt, codex) */}
+      {/* All dialogs (alert, confirm, provider) */}
       <SettingsDialogs
         alertDialog={alertDialog}
         onCloseAlert={closeAlert}
@@ -667,25 +514,6 @@ const SettingsView = ({
         onDeleteProvider={handleDeleteProvider}
         onConfirmDeleteProvider={confirmDeleteProvider}
         onCancelDeleteProvider={cancelDeleteProvider}
-        codexProviderDialog={codexProviderDialog}
-        deleteCodexConfirm={deleteCodexConfirm}
-        onCloseCodexProviderDialog={handleCloseCodexProviderDialog}
-        onSaveCodexProvider={handleSaveCodexProviderFromDialog}
-        onConfirmDeleteCodexProvider={confirmDeleteCodexProvider}
-        onCancelDeleteCodexProvider={cancelDeleteCodexProvider}
-        agentDialog={agentDialog}
-        deleteAgentConfirm={deleteAgentConfirm}
-        onCloseAgentDialog={handleCloseAgentDialog}
-        onSaveAgent={handleSaveAgentFromDialog}
-        onConfirmDeleteAgent={confirmDeleteAgent}
-        onCancelDeleteAgent={cancelDeleteAgent}
-        agentExportDialog={agentExportDialog}
-        agentImportPreviewDialog={agentImportPreviewDialog}
-        agents={agents}
-        onCloseAgentExportDialog={handleCloseAgentExportDialog}
-        onConfirmAgentExport={handleConfirmAgentExport}
-        onCloseAgentImportPreview={handleCloseAgentImportPreview}
-        onSaveImportedAgents={handleSaveImportedAgents}
         addToast={addToast}
       />
 

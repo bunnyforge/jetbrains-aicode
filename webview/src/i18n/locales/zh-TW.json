@@ -505,7 +505,7 @@
             "proxyConfigCodeLabel": "~/.claude/settings.json",
             "proxyConfigCode": "{\n  \"env\": {\n    \"HTTP_PROXY\": \"http://127.0.0.1:7897\",\n    \"HTTPS_PROXY\": \"http://127.0.0.1:7897\"\n  }\n}",
             "issuePrefix": "如果還是不行，可以去GitHub留言排查：",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           },
           "codex": {
             "title": "Codex 訂閱制帳號使用方式",
@@ -519,7 +519,7 @@
             "proxyConfigCodeLabel": "",
             "proxyConfigCode": "",
             "issuePrefix": "如果還是不行，可以去GitHub留言排查：",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           }
         }
       },
@@ -588,7 +588,8 @@
         "xiaomi": "Xiaomi MiMo",
         "xiaomiPlan": "Xiaomi MiMo Plan",
         "qwen": "阿里千問",
-        "openrouter": "OpenRouter"
+        "openrouter": "OpenRouter",
+        "opencode": "OpenCode"
       }
     },
     "comingSoon": "功能即將推出...",
@@ -714,7 +715,11 @@
         "confirmAdd": "Create",
         "saveChanges": "Save"
       }
-    }
+    },
+    "wechatIdLabel": "微信號",
+    "wechatCopyBtn": "複製",
+    "wechatCopied": "微信號已複製到剪貼簿",
+    "wechatCopyFailed": "複製失敗，請手動複製"
   },
   "history": {
     "title": "歷史會話",

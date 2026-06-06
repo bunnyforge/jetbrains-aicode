@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AVAILABLE_MODELS, normalizeClaudeModelId, modelSupports1MContext, strip1MContextSuffix } from '../types';
+import { AVAILABLE_MODELS, normalizeClaudeModelId } from '../types';
 import type { ModelInfo } from '../types';
-import { readClaudeModelMapping } from '../../../utils/claudeModelMapping';
+import {
+  MODEL_ID_TO_MAPPING_KEY,
+  readClaudeModelMapping,
+  resolveMappedModelName,
+} from '../../../utils/claudeModelMapping';
 import { ProviderModelIcon } from '../../shared/ProviderModelIcon';
-import Switch from 'antd/es/switch';
+import { ModelCapabilitiesTags } from '../../settings/ModelCapabilitiesTags';
+import { useModelCapabilitiesMap } from '../../../hooks/useModelCapabilitiesMap';
 
 const RELATIVE_INLINE_BLOCK_STYLE: React.CSSProperties = { position: 'relative', display: 'inline-block' };
 const CHEVRON_ICON_STYLE: React.CSSProperties = { fontSize: '10px', marginLeft: '2px' };
@@ -15,9 +20,13 @@ const DROPDOWN_STYLE: React.CSSProperties = {
   marginBottom: '4px',
   zIndex: 10000,
 };
-const MODEL_OPTION_INFO_STYLE: React.CSSProperties = { display: 'flex', flexDirection: 'column', flex: 1 };
-const LONG_CONTEXT_OPTION_STYLE: React.CSSProperties = { justifyContent: 'space-between', cursor: 'default' };
-const LONG_CONTEXT_LABEL_STYLE: React.CSSProperties = { fontSize: '12px' };
+const MODEL_OPTION_INFO_STYLE: React.CSSProperties = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 };
+const MODEL_ID_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--vscode-editor-font-family, monospace)',
+  fontSize: '13px',
+  fontWeight: 500,
+  wordBreak: 'break-all',
+};
 
 interface ModelSelectProps {
   value: string;
@@ -25,8 +34,6 @@ interface ModelSelectProps {
   models?: ModelInfo[];
   currentProvider?: string;
   onAddModel?: () => void;
-  longContextEnabled?: boolean;
-  onLongContextChange?: (enabled: boolean) => void;
 }
 
 const DEFAULT_MODEL_MAP: Record<string, ModelInfo> = AVAILABLE_MODELS.reduce(
@@ -42,64 +49,7 @@ const MODEL_LABEL_KEYS: Record<string, string> = {
   'claude-opus-4-8': 'models.claude.opus48.label',
   'claude-opus-4-7': 'models.claude.opus46.label',
   'claude-opus-4-6': 'models.claude.opus46_1m.label',
-  'claude-opus-4-6[1m]': 'models.claude.opus46_1m.label',
   'claude-haiku-4-5': 'models.claude.haiku45.label',
-  'gpt-5.5': 'models.codex.gpt55.label',
-  'gpt-5.4': 'models.codex.gpt54.label',
-  'gpt-5.2-codex': 'models.codex.gpt52codex.label',
-  'gpt-5.1-codex-max': 'models.codex.gpt51codexMax.label',
-  'gpt-5.4-mini': 'models.codex.gpt54mini.label',
-  'gpt-5.3-codex': 'models.codex.gpt53codex.label',
-  'gpt-5.3-codex-spark': 'models.codex.gpt53codexSpark.label',
-  'gpt-5.2': 'models.codex.gpt52.label',
-  'gpt-5.1-codex-mini': 'models.codex.gpt51codexMini.label',
-};
-
-const MODEL_DESCRIPTION_KEYS: Record<string, string> = {
-  'claude-sonnet-4-6': 'models.claude.sonnet46.description',
-  'claude-opus-4-8': 'models.claude.opus48.description',
-  'claude-opus-4-7': 'models.claude.opus46.description',
-  'claude-opus-4-6': 'models.claude.opus46_1m.description',
-  'claude-opus-4-6[1m]': 'models.claude.opus46_1m.description',
-  'claude-haiku-4-5': 'models.claude.haiku45.description',
-  'gpt-5.5': 'models.codex.gpt55.description',
-  'gpt-5.4': 'models.codex.gpt54.description',
-  'gpt-5.2-codex': 'models.codex.gpt52codex.description',
-  'gpt-5.1-codex-max': 'models.codex.gpt51codexMax.description',
-  'gpt-5.4-mini': 'models.codex.gpt54mini.description',
-  'gpt-5.3-codex': 'models.codex.gpt53codex.description',
-  'gpt-5.3-codex-spark': 'models.codex.gpt53codexSpark.description',
-  'gpt-5.2': 'models.codex.gpt52.description',
-  'gpt-5.1-codex-mini': 'models.codex.gpt51codexMini.description',
-};
-
-/**
- * Maps model IDs to mapping keys for looking up actual model names
- * from the 'claude-model-mapping' localStorage entry.
- * Legacy Opus 4.6 IDs share the same opus mapping bucket.
- */
-const MODEL_ID_TO_MAPPING_KEY: Record<string, string> = {
-  'claude-sonnet-4-6': 'sonnet',
-  'claude-opus-4-8': 'opus',
-  'claude-opus-4-7': 'opus',
-  'claude-opus-4-6': 'opus',
-  'claude-opus-4-6[1m]': 'opus',
-  'claude-haiku-4-5': 'haiku',
-};
-
-const resolveMappedModelName = (
-  mappingKey: string | undefined,
-  modelMapping: Record<string, string | undefined>
-): string | undefined => {
-  if (!mappingKey) {
-    return modelMapping.main?.trim() || undefined;
-  }
-
-  const mapped = modelMapping[mappingKey]
-    || (mappingKey === 'opus_1m' ? modelMapping.opus : undefined)
-    || modelMapping.main;
-
-  return mapped?.trim() || undefined;
 };
 
 /**
@@ -108,49 +58,56 @@ const resolveMappedModelName = (
  */
 const resolveModelIdForIcon = (
   modelId: string,
-  modelMapping: Record<string, string | undefined>,
-  mappingKeyMap: Record<string, string>
+  modelMapping: Record<string, string | undefined>
 ): string => {
-  const mappingKey = mappingKeyMap[modelId];
-  if (!mappingKey) {
+  if (!(modelId in MODEL_ID_TO_MAPPING_KEY)) {
     return modelId;
   }
-  const mapped = resolveMappedModelName(mappingKey, modelMapping);
-  if (mapped) {
-    return mapped;
-  }
-  return modelId;
+  return resolveMappedModelName(modelId, modelMapping) ?? modelId;
 };
 
 /**
  * ModelSelect - Model selector component
  * Supports switching between Sonnet 4.5, Opus 4.5, and other models, including Codex models
  */
-export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, currentProvider = 'claude', onAddModel, longContextEnabled = true, onLongContextChange }: ModelSelectProps) => {
+export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, currentProvider = 'claude', onAddModel }: ModelSelectProps) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Strip [1m] suffix for finding the model in the list
-  const strippedValue = strip1MContextSuffix(value);
-  const normalizedValue = currentProvider === 'claude' ? normalizeClaudeModelId(strippedValue) : strippedValue;
-  const currentModel = models.find(m => m.id === normalizedValue) || models.find(m => m.id === strippedValue) || models[0];
+  const normalizedValue = currentProvider === 'claude' ? normalizeClaudeModelId(value) : value;
+  const currentModel = models.find(m => m.id === normalizedValue) || models[0];
   const modelMapping = readClaudeModelMapping();
+
+  // Resolve the *effective* model id (post-mapping) for the catalog lookup,
+  // so the displayed tags match the model actually sent to the backend.
+  const effectiveModelIds = useMemo(
+    () =>
+      models.map((m) =>
+        resolveModelIdForIcon(m.id, modelMapping) ?? m.id
+      ),
+    [models, modelMapping]
+  );
+
+  // Batch OpenRouter metadata lookup — only runs while the dropdown is open
+  // to avoid the per-keystroke work for the static header chip.
+  const { map: capabilitiesMap } = useModelCapabilitiesMap(
+    isOpen ? effectiveModelIds : []
+  );
 
   const isSelectedModel = (modelId: string): boolean => {
     if (currentProvider !== 'claude') {
-      return modelId === strippedValue;
+      return modelId === value;
     }
     return normalizeClaudeModelId(modelId) === normalizedValue;
   };
 
-  const getModelLabel = (model: ModelInfo, show1MContext = false): string => {
-    const mappingKey = MODEL_ID_TO_MAPPING_KEY[model.id];
-    if (mappingKey) {
-      const mappedName = resolveMappedModelName(mappingKey, modelMapping);
+  const getModelLabel = (model: ModelInfo): string => {
+    if (model.id in MODEL_ID_TO_MAPPING_KEY) {
+      const mappedName = resolveMappedModelName(model.id, modelMapping);
       if (mappedName) {
-        return append1MContextSuffix(mappedName, model.id, show1MContext);
+        return mappedName;
       }
     }
 
@@ -159,30 +116,14 @@ export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, curren
     const hasCustomLabel = defaultModel && model.label && model.label !== defaultModel.label;
 
     if (hasCustomLabel) {
-      return append1MContextSuffix(model.label ?? '', model.id, show1MContext);
+      return model.label ?? '';
     }
 
     if (labelKey) {
-      return append1MContextSuffix(t(labelKey), model.id, show1MContext);
+      return t(labelKey);
     }
 
-    return append1MContextSuffix(model.label ?? '', model.id, show1MContext);
-  };
-
-  const append1MContextSuffix = (label: string, modelId: string, show1MContext: boolean): string => {
-    // Only show 1M context suffix for Claude provider
-    if (currentProvider === 'claude' && show1MContext && modelSupports1MContext(modelId) && longContextEnabled) {
-      return `${label} (${t('models.longContext.shortLabel')})`;
-    }
-    return label;
-  };
-
-  const getModelDescription = (model: ModelInfo): string | undefined => {
-    const descriptionKey = MODEL_DESCRIPTION_KEYS[model.id];
-    if (descriptionKey) {
-      return t(descriptionKey);
-    }
-    return model.description;
+    return model.label ?? '';
   };
 
   /**
@@ -235,15 +176,15 @@ export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, curren
         ref={buttonRef}
         className="selector-button"
         onClick={handleToggle}
-        title={t('chat.currentModel', { model: getModelLabel(currentModel, true) })}
+        title={t('chat.currentModel', { model: getModelLabel(currentModel) })}
       >
         <ProviderModelIcon
           providerId={currentProvider}
-          modelId={resolveModelIdForIcon(currentModel.id, modelMapping, MODEL_ID_TO_MAPPING_KEY)}
+          modelId={resolveModelIdForIcon(currentModel.id, modelMapping)}
           size={12}
           colored
         />
-        <span className="selector-button-text">{getModelLabel(currentModel, true)}</span>
+        <span className="selector-button-text">{getModelLabel(currentModel)}</span>
         <span className={`codicon codicon-chevron-${isOpen ? 'up' : 'down'}`} style={CHEVRON_ICON_STYLE} />
       </button>
 
@@ -253,47 +194,36 @@ export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, curren
           className="selector-dropdown"
           style={DROPDOWN_STYLE}
         >
-          {models.map((model) => (
-            <div
-              key={model.id}
-              className={`selector-option ${isSelectedModel(model.id) ? 'selected' : ''}`}
-              onClick={() => handleSelect(model.id)}
-            >
-              <ProviderModelIcon
-                providerId={currentProvider}
-                modelId={resolveModelIdForIcon(model.id, modelMapping, MODEL_ID_TO_MAPPING_KEY)}
-                size={16}
-                colored
-              />
-              <div style={MODEL_OPTION_INFO_STYLE}>
-                <span>{getModelLabel(model, false)}</span>
-                {getModelDescription(model) && (
-                  <span className="model-description">{getModelDescription(model)}</span>
+          {models.map((model) => {
+            const effectiveId = resolveModelIdForIcon(model.id, modelMapping) ?? model.id;
+            const caps = capabilitiesMap.get(effectiveId);
+            return (
+              <div
+                key={model.id}
+                className={`selector-option ${isSelectedModel(model.id) ? 'selected' : ''}`}
+                onClick={() => handleSelect(model.id)}
+              >
+                <ProviderModelIcon
+                  providerId={currentProvider}
+                  modelId={effectiveId}
+                  size={16}
+                  colored
+                />
+                <div style={MODEL_OPTION_INFO_STYLE}>
+                  <span style={MODEL_ID_STYLE}>{effectiveId}</span>
+                  <ModelCapabilitiesTags
+                    capabilities={caps ?? null}
+                    showImage
+                    showTools
+                    compact
+                  />
+                </div>
+                {isSelectedModel(model.id) && (
+                  <span className="codicon codicon-check check-mark" />
                 )}
               </div>
-              {isSelectedModel(model.id) && (
-                <span className="codicon codicon-check check-mark" />
-              )}
-            </div>
-          ))}
-          {currentProvider === 'claude' && onLongContextChange && (
-            <>
-              <div className="selector-divider" />
-              <div
-                className="selector-option"
-                style={LONG_CONTEXT_OPTION_STYLE}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <span style={LONG_CONTEXT_LABEL_STYLE}>{t('models.longContext.shortLabel')}</span>
-                <Switch
-                  size="small"
-                  checked={modelSupports1MContext(value) ? longContextEnabled : false}
-                  disabled={!modelSupports1MContext(value)}
-                  onChange={onLongContextChange}
-                />
-              </div>
-            </>
-          )}
+            );
+          })}
           {onAddModel && (
             <>
               <div className="selector-divider" />

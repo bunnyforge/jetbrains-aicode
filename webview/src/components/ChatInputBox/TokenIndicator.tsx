@@ -19,12 +19,16 @@ export const TokenIndicator = ({
   // Circumference
   const circumference = 2 * Math.PI * radius;
 
-  // Calculate offset (fill clockwise from top)
-  const strokeOffset = circumference * (1 - percentage / 100);
+  // Clamp the ring fill to [0, 100] so it stays a valid SVG arc even when
+  // the backend reports overflow (>100%). The label and tooltip show the
+  // unclamped value so overflow is still visible to the user.
+  const ringPercentage = Math.max(0, Math.min(100, percentage));
+  const strokeOffset = circumference * (1 - ringPercentage / 100);
 
-  // Indicator label: integer percentage (no decimal)
+  // Indicator label: integer percentage (no decimal) — show the real value,
+  // not the clamped one, so an overflow reads as e.g. "105%".
   const labelPercentage = `${Math.round(percentage)}%`;
-  // Tooltip: one decimal place for precision
+  // Tooltip: one decimal place for precision (also unclamped).
   const tooltipPercentage = `${(Math.round(percentage * 10) / 10).toFixed(1)}%`;
 
   const formatTokens = (value?: number) => {

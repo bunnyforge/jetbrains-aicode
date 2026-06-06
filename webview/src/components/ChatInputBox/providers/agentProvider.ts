@@ -190,13 +190,6 @@ export async function agentProvider(
   setupAgentsCallback();
 
   const now = Date.now();
-  
-  // Create new agent item
-  const createNewAgentItem: AgentItem = {
-    id: CREATE_NEW_AGENT_ID,
-    name: i18n.t('settings.agent.createAgent'),
-    prompt: '',
-  };
 
   if (loadingState === 'idle' || loadingState === 'failed') {
     requestRefresh();
@@ -215,7 +208,7 @@ export async function agentProvider(
       id: EMPTY_STATE_ID,
       name: retryCount >= MAX_RETRY_COUNT ? i18n.t('settings.agent.loadFailed') : i18n.t('settings.agent.noAgentsDropdown'),
       prompt: '',
-    }, createNewAgentItem];
+    }];
   }
 
   const filtered = cachedAgents.length > 0 ? filterAgents(cachedAgents, query) : [];
@@ -225,10 +218,10 @@ export async function agentProvider(
       id: EMPTY_STATE_ID,
       name: i18n.t('settings.agent.noAgentsDropdown'),
       prompt: '',
-    }, createNewAgentItem];
+    }];
   }
 
-  return [...filtered, createNewAgentItem];
+  return [...filtered];
 }
 
 export function agentToDropdownItem(agent: AgentItem): DropdownItemData {

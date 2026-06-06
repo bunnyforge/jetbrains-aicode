@@ -3,7 +3,6 @@ package com.github.claudecodegui.handler.history;
 import com.github.claudecodegui.handler.core.HandlerContext;
 
 import com.github.claudecodegui.provider.claude.ClaudeHistoryReader;
-import com.github.claudecodegui.provider.codex.CodexHistoryReader;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -51,17 +50,11 @@ class HistoryExportService {
                 LOG.info("[HistoryHandler] ProjectPath: " + projectPath);
                 LOG.info("[HistoryHandler] CurrentProvider: " + currentProvider);
 
-                // Choose a different reader based on the provider
+                // Read session messages
                 String messagesJson;
-                if ("codex".equals(currentProvider)) {
-                    LOG.info("[HistoryHandler] 使用 CodexHistoryReader 读取 Codex 会话消息");
-                    CodexHistoryReader codexReader = new CodexHistoryReader();
-                    messagesJson = codexReader.getSessionMessagesAsJson(sessionId);
-                } else {
-                    LOG.info("[HistoryHandler] 使用 ClaudeHistoryReader 读取 Claude 会话消息");
-                    ClaudeHistoryReader historyReader = new ClaudeHistoryReader();
-                    messagesJson = historyReader.getSessionMessagesAsJson(projectPath, sessionId);
-                }
+                LOG.info("[HistoryHandler] 使用 ClaudeHistoryReader 读取 Claude 会话消息");
+                ClaudeHistoryReader historyReader = new ClaudeHistoryReader();
+                messagesJson = historyReader.getSessionMessagesAsJson(projectPath, sessionId);
 
                 // Wrap messages into an object containing sessionId and title
                 JsonObject exportData = new JsonObject();

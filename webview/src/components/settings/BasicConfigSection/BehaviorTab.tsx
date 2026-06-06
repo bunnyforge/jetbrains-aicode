@@ -92,8 +92,8 @@ export interface BehaviorTabProps {
   /**
    * Whether the "create new session with existing messages" confirm dialog is
    * enabled (i.e. shown). Positive semantics: `true` = dialog shows, `false` =
-   * silently create the new session. Default `true` to preserve safer behaviour
-   * for upgrading users.
+   * silently create the new session. Default `false` (skip the dialog) per
+   * the design choice that this is a low-stakes UX interruption.
    */
   newSessionConfirmEnabled?: boolean;
   onNewSessionConfirmEnabledChange?: (enabled: boolean) => void;
@@ -129,7 +129,7 @@ const BehaviorTab = ({
   onStatusBarWidgetEnabledChange = () => {},
   aiTitleGenerationEnabled = true,
   onAiTitleGenerationEnabledChange = () => {},
-  newSessionConfirmEnabled = true,
+  newSessionConfirmEnabled = false,
   onNewSessionConfirmEnabledChange = () => {},
   soundNotificationEnabled = false,
   onSoundNotificationEnabledChange = () => {},

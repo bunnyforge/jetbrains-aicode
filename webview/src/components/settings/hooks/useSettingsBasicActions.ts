@@ -57,7 +57,6 @@ export interface UseSettingsBasicActionsReturn {
   /** Streaming enabled state (prefers prop over local state) */
   streamingEnabled: boolean;
   localStreamingEnabled: boolean;
-  codexSandboxMode: 'workspace-write' | 'danger-full-access';
   /** Send shortcut state (prefers prop over local state) */
   sendShortcut: 'enter' | 'cmdEnter';
   localSendShortcut: 'enter' | 'cmdEnter';
@@ -96,7 +95,6 @@ export interface UseSettingsBasicActionsReturn {
   handleSaveCodeFontCustomPath: (path: string) => void;
   handleBrowseCodeFontFile: () => void;
   handleStreamingEnabledChange: (enabled: boolean) => void;
-  handleCodexSandboxModeChange: (mode: 'workspace-write' | 'danger-full-access') => void;
   handleSendShortcutChange: (shortcut: 'enter' | 'cmdEnter') => void;
   handleAutoOpenFileEnabledChange: (enabled: boolean) => void;
   handleSoundNotificationEnabledChange: (enabled: boolean) => void;
@@ -145,7 +143,6 @@ export interface UseSettingsBasicActionsReturn {
   /** @internal */ setUiFontConfig: (config: UiFontConfig | undefined) => void;
   /** @internal */ setCodeFontConfig: (config: CodeFontConfig | undefined) => void;
   /** @internal */ setLocalStreamingEnabled: (enabled: boolean) => void;
-  /** @internal */ setCodexSandboxMode: (mode: 'workspace-write' | 'danger-full-access') => void;
   /** @internal */ setLocalSendShortcut: (shortcut: 'enter' | 'cmdEnter') => void;
   /** @internal */ setLocalAutoOpenFileEnabled: (enabled: boolean) => void;
   /** @internal */ setCommitPrompt: (prompt: string) => void;
@@ -206,10 +203,6 @@ export function useSettingsBasicActions({
   // Streaming configuration - prefer props, fallback to local state
   const [localStreamingEnabled, setLocalStreamingEnabled] = useState<boolean>(false);
   const streamingEnabled = streamingEnabledProp ?? localStreamingEnabled;
-
-  const [codexSandboxMode, setCodexSandboxMode] = useState<'workspace-write' | 'danger-full-access'>(
-    'danger-full-access'
-  );
 
   // Send shortcut configuration - prefer props, fallback to local state
   const [localSendShortcut, setLocalSendShortcut] = useState<'enter' | 'cmdEnter'>('enter');
@@ -383,12 +376,6 @@ export function useSettingsBasicActions({
     }
   }, [onStreamingEnabledChangeProp]);
 
-  const handleCodexSandboxModeChange = useCallback((mode: 'workspace-write' | 'danger-full-access') => {
-    setCodexSandboxMode(mode);
-    const payload = { sandboxMode: mode };
-    sendToJava(`set_codex_sandbox_mode:${JSON.stringify(payload)}`);
-  }, []);
-
   // Send shortcut change handler
   const handleSendShortcutChange = useCallback((shortcut: 'enter' | 'cmdEnter') => {
     // If prop callback is provided (from App.tsx), use it for centralized state management
@@ -511,7 +498,7 @@ export function useSettingsBasicActions({
   }, [commitAiConfig]);
 
   const handleCommitAiModelChange = useCallback((model: string) => {
-    const activeProvider = commitAiConfig.provider ?? commitAiConfig.effectiveProvider ?? 'codex';
+    const activeProvider = commitAiConfig.provider ?? commitAiConfig.effectiveProvider ?? 'claude';
     const nextConfig: CommitAiConfig = {
       ...commitAiConfig,
       models: {
@@ -530,10 +517,8 @@ export function useSettingsBasicActions({
     const nextConfig: CommitAiConfig = {
       ...commitAiConfig,
       provider: null,
-      effectiveProvider: commitAiConfig.availability.codex
-        ? 'codex'
-        : (commitAiConfig.availability.claude ? 'claude' : null),
-      resolutionSource: commitAiConfig.availability.codex || commitAiConfig.availability.claude
+      effectiveProvider: commitAiConfig.availability.claude ? 'claude' : null,
+      resolutionSource: commitAiConfig.availability.claude
         ? 'auto'
         : 'unavailable',
     };
@@ -579,10 +564,8 @@ export function useSettingsBasicActions({
     const nextConfig: PromptEnhancerConfig = {
       ...promptEnhancerConfig,
       provider: null,
-      effectiveProvider: promptEnhancerConfig.availability.codex
-        ? 'codex'
-        : (promptEnhancerConfig.availability.claude ? 'claude' : null),
-      resolutionSource: promptEnhancerConfig.availability.codex || promptEnhancerConfig.availability.claude
+      effectiveProvider: promptEnhancerConfig.availability.claude ? 'claude' : null,
+      resolutionSource: promptEnhancerConfig.availability.claude
         ? 'auto'
         : 'unavailable',
     };
@@ -633,8 +616,6 @@ export function useSettingsBasicActions({
     localStreamingEnabled,
     setLocalStreamingEnabled,
     streamingEnabled,
-    codexSandboxMode,
-    setCodexSandboxMode,
     localSendShortcut,
     setLocalSendShortcut,
     sendShortcut,
@@ -669,7 +650,6 @@ export function useSettingsBasicActions({
     handleSaveCodeFontCustomPath,
     handleBrowseCodeFontFile,
     handleStreamingEnabledChange,
-    handleCodexSandboxModeChange,
     handleSendShortcutChange,
     handleAutoOpenFileEnabledChange,
     handleSoundNotificationEnabledChange,

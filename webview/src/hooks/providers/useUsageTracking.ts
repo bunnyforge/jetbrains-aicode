@@ -4,8 +4,6 @@ const PROVIDER_TO_SDK: Record<string, string> = {
   claude: 'claude-sdk',
   anthropic: 'claude-sdk',
   bedrock: 'claude-sdk',
-  codex: 'codex-sdk',
-  openai: 'codex-sdk',
 };
 
 type SdkStatus = Record<string, { installed?: boolean; status?: string }>;

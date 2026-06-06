@@ -28,15 +28,18 @@ export interface SkipNewSessionConfirmChangedDetail {
 }
 
 /**
- * Read the current preference. Defaults to `false` (i.e. keep showing the dialog)
- * so existing users see no behaviour change after upgrade.
+ * Read the current preference. Defaults to `true` (i.e. silently create the new
+ * session, skip the confirm dialog) — creating a new session is a low-stakes
+ * UX interruption, so the dialog is opt-in.
  */
 export function getSkipNewSessionConfirm(): boolean {
   try {
-    return localStorage.getItem(SKIP_NEW_SESSION_CONFIRM_KEY) === 'true';
+    const stored = localStorage.getItem(SKIP_NEW_SESSION_CONFIRM_KEY);
+    if (stored === null) return true;
+    return stored === 'true';
   } catch {
-    // localStorage can throw in some sandboxed contexts; fall back to safest default.
-    return false;
+    // localStorage can throw in some sandboxed contexts; fall back to default.
+    return true;
   }
 }
 

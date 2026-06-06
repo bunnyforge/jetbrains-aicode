@@ -151,7 +151,6 @@ const NETWORK_ENV_VARS = [
 
 const LOCAL_SETTINGS_PROVIDER_ID = '__local_settings_json__';
 const CLI_LOGIN_PROVIDER_ID = '__cli_login__';
-const CODEX_CLI_LOGIN_PROVIDER_ID = '__codex_cli_login__';
 const injectedNetworkEnvVars = new Map();
 
 function clearInjectedNetworkEnvVars() {
@@ -216,24 +215,6 @@ export function getClaudeRuntimeState() {
 
   if (!hasExplicitCurrent && providerIds.length > 0) {
     return { access: 'managed', currentId: providerIds[0] };
-  }
-
-  return { access: 'inactive', currentId };
-}
-
-export function getCodexRuntimeState() {
-  const config = loadCodemossConfig();
-  const codex = config?.codex && typeof config.codex === 'object' ? config.codex : null;
-  const providers = codex?.providers && typeof codex.providers === 'object' ? codex.providers : {};
-  const hasExplicitCurrent = !!codex && Object.prototype.hasOwnProperty.call(codex, 'current') && codex.current !== null;
-  const currentId = hasExplicitCurrent ? String(codex.current).trim() : '';
-
-  if (currentId === CODEX_CLI_LOGIN_PROVIDER_ID) {
-    return { access: 'cli_login', currentId };
-  }
-
-  if (currentId && Object.prototype.hasOwnProperty.call(providers, currentId)) {
-    return { access: 'managed', currentId };
   }
 
   return { access: 'inactive', currentId };

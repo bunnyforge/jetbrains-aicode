@@ -41,7 +41,7 @@ class ClaudeRequestParamsBuilder {
         params.addProperty("runtimeSessionEpoch", runtimeSessionEpoch != null ? runtimeSessionEpoch : "");
         params.addProperty("cwd", cwd != null ? cwd : "");
         params.addProperty("permissionMode", permissionMode != null ? permissionMode : "");
-        params.addProperty("model", model != null ? model : "");
+        params.addProperty("model", sanitizeModelIdForApi(model));
 
         JsonArray attachmentArray = serializeAttachments(attachments);
         if (attachmentArray != null && attachmentArray.size() > 0) {
@@ -65,6 +65,30 @@ class ClaudeRequestParamsBuilder {
         }
 
         return params;
+    }
+
+    private static final java.util.regex.Pattern CONTEXT_SUFFIX_PATTERN =
+            java.util.regex.Pattern.compile("\\s*\\[\\d+(?:\\.\\d+)?[kKmM]\\]\\s*$");
+
+    /**
+     * Strip Claude-specific context suffix ([1m], [200k], ...) for non-Claude
+     * model IDs before forwarding to the API. Third-party providers reject
+     * unknown model IDs containing square brackets (e.g., minimax/minimax-m2.5[1m]
+     * returns HTTP 400). Official Claude models keep the suffix so the runtime
+     * is spawned with the correct extended context window.
+     */
+    private static String sanitizeModelIdForApi(String model) {
+        if (model == null || model.isEmpty()) {
+            return model;
+        }
+        if (!CONTEXT_SUFFIX_PATTERN.matcher(model).find()) {
+            return model;
+        }
+        String base = CONTEXT_SUFFIX_PATTERN.matcher(model).replaceAll("");
+        if (base.toLowerCase().startsWith("claude-")) {
+            return model;
+        }
+        return base;
     }
 
     private JsonArray serializeAttachments(List<ClaudeSession.Attachment> attachments) {

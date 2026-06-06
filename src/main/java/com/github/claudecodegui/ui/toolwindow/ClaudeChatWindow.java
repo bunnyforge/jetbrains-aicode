@@ -7,7 +7,7 @@ import com.github.claudecodegui.handler.core.MessageDispatcher;
 import com.github.claudecodegui.handler.PermissionHandler;
 import com.github.claudecodegui.permission.PermissionService;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.opencode.OpencodeSDKBridge;
 import com.github.claudecodegui.provider.common.DaemonBridge;
 import com.github.claudecodegui.provider.common.MessageCallback;
 import com.github.claudecodegui.session.ClaudeSession;
@@ -48,7 +48,7 @@ public class ClaudeChatWindow {
 
     private final JPanel mainPanel;
     private final ClaudeSDKBridge claudeSDKBridge;
-    private final CodexSDKBridge codexSDKBridge;
+    private final OpencodeSDKBridge opencodeSDKBridge;
     private final Project project;
     private final CodemossSettingsService settingsService;
     private final HtmlLoader htmlLoader;
@@ -92,7 +92,7 @@ public class ClaudeChatWindow {
     public ClaudeChatWindow(Project project, boolean skipRegister) {
         this.project = project;
         this.claudeSDKBridge = new ClaudeSDKBridge();
-        this.codexSDKBridge = new CodexSDKBridge();
+        this.opencodeSDKBridge = new OpencodeSDKBridge();
         this.settingsService = new CodemossSettingsService();
         this.htmlLoader = new HtmlLoader(getClass());
         this.mainPanel = new JPanel(new BorderLayout());
@@ -130,7 +130,7 @@ public class ClaudeChatWindow {
                 () -> streamCoalescer.isStreamActive()
         );
 
-        this.session = new ClaudeSession(project, claudeSDKBridge, codexSDKBridge);
+        this.session = new ClaudeSession(project, claudeSDKBridge, opencodeSDKBridge);
 
         this.chatWindowDelegate = new ChatWindowDelegate(createDelegateHost());
         chatWindowDelegate.loadPermissionModeFromSettings();
@@ -151,8 +151,8 @@ public class ClaudeChatWindow {
             }
 
             @Override
-            public CodexSDKBridge getCodexSDKBridge() {
-                return codexSDKBridge;
+            public OpencodeSDKBridge getOpencodeSDKBridge() {
+                return opencodeSDKBridge;
             }
 
             @Override
@@ -320,10 +320,6 @@ public class ClaudeChatWindow {
         return claudeSDKBridge;
     }
 
-    public CodexSDKBridge getCodexSDKBridge() {
-        return codexSDKBridge;
-    }
-
     /**
      * Get the project associated with this chat window.
      *
@@ -345,8 +341,7 @@ public class ClaudeChatWindow {
      * intent, not the lingering SDK).
      */
     public String getCurrentProvider() {
-        HandlerContext ctx = this.handlerContext;
-        return ctx != null ? ctx.getCurrentProvider() : "claude";
+        return "claude";
     }
 
     public ClaudeSession getSession() {
@@ -784,18 +779,6 @@ public class ClaudeChatWindow {
         }
 
         try {
-            if (codexSDKBridge != null) {
-                int activeCount = codexSDKBridge.getActiveProcessCount();
-                if (activeCount > 0) {
-                    LOG.info("Cleaning up " + activeCount + " active Codex process(es)...");
-                }
-                codexSDKBridge.cleanupAllProcesses();
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to clean up Codex processes: " + e.getMessage());
-        }
-
-        try {
             if (browser != null) {
                 browser.dispose();
                 browser = null;
@@ -823,11 +806,6 @@ public class ClaudeChatWindow {
             @Override
             public ClaudeSDKBridge getClaudeSDKBridge() {
                 return claudeSDKBridge;
-            }
-
-            @Override
-            public CodexSDKBridge getCodexSDKBridge() {
-                return codexSDKBridge;
             }
 
             @Override
@@ -890,11 +868,6 @@ public class ClaudeChatWindow {
             @Override
             public ClaudeSDKBridge getClaudeSDKBridge() {
                 return claudeSDKBridge;
-            }
-
-            @Override
-            public CodexSDKBridge getCodexSDKBridge() {
-                return codexSDKBridge;
             }
 
             @Override

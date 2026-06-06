@@ -40,6 +40,17 @@ interface ContextBarProps {
   autoOpenFileEnabled?: boolean;
   /** Callback to enable file context (called from placeholder click) */
   onRequestEnableFileContext?: () => void;
+  /**
+   * Whether the active model supports image input. When `false`, the
+   * attach button is disabled because attachments are only used to send
+   * image bytes to the model. File-path references are unaffected.
+   */
+  imageInputSupported?: boolean;
+  /**
+   * Callback fired when the disabled attach button is clicked — used to
+   * surface a toast explaining why attachment is disabled.
+   */
+  onUnsupportedAttachAttempt?: () => void;
 }
 
 export const ContextBar: React.FC<ContextBarProps> = memo(({
@@ -60,6 +71,8 @@ export const ContextBar: React.FC<ContextBarProps> = memo(({
   onToggleStatusPanel,
   autoOpenFileEnabled = false,
   onRequestEnableFileContext,
+  imageInputSupported = true,
+  onUnsupportedAttachAttempt,
 }) => {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,8 +110,12 @@ export const ContextBar: React.FC<ContextBarProps> = memo(({
   const handleAttachClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!imageInputSupported) {
+      onUnsupportedAttachAttempt?.();
+      return;
+    }
     fileInputRef.current?.click();
-  }, []);
+  }, [imageInputSupported, onUnsupportedAttachAttempt]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -149,7 +166,17 @@ export const ContextBar: React.FC<ContextBarProps> = memo(({
         <div
           className="context-tool-btn"
           onClick={handleAttachClick}
-          title="Add attachment"
+          title={
+            imageInputSupported
+              ? t('common.addAttachment', { defaultValue: 'Add attachment' })
+              : t('contextBar.attachmentDisabled', { defaultValue: 'This model does not support image attachments' })
+          }
+          aria-disabled={!imageInputSupported}
+          style={
+            imageInputSupported
+              ? undefined
+              : { opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'auto' }
+          }
         >
           <span className="codicon codicon-attach" />
         </div>

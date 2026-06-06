@@ -21,7 +21,7 @@ public class SessionMessageOrchestrator {
     private static final int MAX_UUID_SYNC_RETRIES = 3;
 
     public interface SessionHistoryAccess {
-        List<JsonObject> getProviderSessionMessages(String provider, String sessionId, String cwd);
+        List<JsonObject> getProviderSessionMessages(String sessionId, String cwd);
 
         JsonObject getLatestClaudeUserMessage(String sessionId, String cwd);
     }
@@ -76,7 +76,7 @@ public class SessionMessageOrchestrator {
     }
 
     public CompletableFuture<Void> syncUserMessageUuidsAfterSend() {
-        if ("codex".equals(state.getProvider()) || findLatestUnresolvedUserMessage() == null) {
+        if (findLatestUnresolvedUserMessage() == null) {
             return CompletableFuture.completedFuture(null);
         }
 
@@ -142,11 +142,10 @@ public class SessionMessageOrchestrator {
             try {
                 String currentSessionId = state.getSessionId();
                 String currentCwd = state.getCwd();
-                String currentProvider = state.getProvider();
 
                 LOG.info("Loading session from server: sessionId=" + currentSessionId + ", cwd=" + currentCwd);
                 List<JsonObject> serverMessages =
-                        historyAccess.getProviderSessionMessages(currentProvider, currentSessionId, currentCwd);
+                        historyAccess.getProviderSessionMessages(currentSessionId, currentCwd);
                 if (serverMessages == null) {
                     serverMessages = List.of();
                 }

@@ -170,7 +170,7 @@ final class BridgePathLocator {
         }
         LOG.debug("[BridgeResolver] node_modules found");
 
-        // AI SDKs (@anthropic-ai/claude-agent-sdk, @openai/codex-sdk, etc.)
+        // AI SDKs (@anthropic-ai/claude-agent-sdk, etc.)
         // are loaded dynamically from ~/.codemoss/dependencies/, no need to check within ai-bridge
 
         return true;

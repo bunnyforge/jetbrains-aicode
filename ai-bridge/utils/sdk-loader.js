@@ -23,10 +23,6 @@ const SDK_DEFINITIONS = {
     CLAUDE: {
         id: 'claude-sdk',
         npmPackage: '@anthropic-ai/claude-agent-sdk'
-    },
-    CODEX: {
-        id: 'codex-sdk',
-        npmPackage: '@openai/codex-sdk'
     }
 };
 
@@ -35,7 +31,7 @@ function getSdkRootDir(sdkId) {
 }
 
 function getPackageDirFromRoot(sdkRootDir, pkgName) {
-    // pkgName like: "@anthropic-ai/claude-agent-sdk" or "@openai/codex-sdk"
+    // pkgName like: "@anthropic-ai/claude-agent-sdk"
     // Logic kept consistent with DependencyManager.getPackageDir()
     const parts = pkgName.split('/');
     return join(sdkRootDir, 'node_modules', ...parts);
@@ -120,22 +116,6 @@ export function isClaudeSdkAvailable() {
 }
 
 /**
- * Check whether the Codex SDK is available
- * Logic kept consistent with DependencyManager.isInstalled("codex")
- */
-export function isCodexSdkAvailable() {
-    const sdkId = 'codex-sdk';
-    const npmPackage = '@openai/codex-sdk';
-    const sdkPath = getPackageDirFromRoot(getSdkRootDir(sdkId), npmPackage);
-    const exists = existsSync(sdkPath);
-    console.log('[sdk-loader] isCodexSdkAvailable:', {
-        path: sdkPath,
-        exists: exists
-    });
-    return exists;
-}
-
-/**
  * Dynamically load the Claude SDK
  * @returns {Promise<{query: Function, ...}>}
  * @throws {Error} If the SDK is not installed
@@ -193,48 +173,6 @@ export async function loadClaudeSdk() {
     })();
 
     loadingPromises.set('claude', loadPromise);
-    return loadPromise;
-}
-
-/**
- * Dynamically load the Codex SDK
- * @returns {Promise<{Codex: Class, ...}>}
- * @throws {Error} If the SDK is not installed
- */
-export async function loadCodexSdk() {
-    // Return the cached SDK if available
-    if (sdkCache.has('codex')) {
-        return sdkCache.get('codex');
-    }
-
-    // If a load is already in progress, return the same promise to prevent duplicate loading
-    if (loadingPromises.has('codex')) {
-        return loadingPromises.get('codex');
-    }
-
-    const sdkRootDir = getSdkRootDir('codex-sdk');
-    const sdkPath = getPackageDirFromRoot(sdkRootDir, '@openai/codex-sdk');
-
-    if (!existsSync(sdkPath)) {
-        throw new Error('SDK_NOT_INSTALLED:codex');
-    }
-
-    // Create and cache the loading promise
-    const loadPromise = (async () => {
-        try {
-            const resolvedUrl = resolveExternalPackageUrl('@openai/codex-sdk', sdkRootDir);
-            const sdk = await import(resolvedUrl);
-
-            sdkCache.set('codex', sdk);
-            return sdk;
-        } catch (error) {
-            throw new Error(`Failed to load Codex SDK: ${error.message}`);
-        } finally {
-            loadingPromises.delete('codex');
-        }
-    })();
-
-    loadingPromises.set('codex', loadPromise);
     return loadPromise;
 }
 
@@ -326,16 +264,11 @@ export async function loadBedrockSdk() {
 export function getSdkStatus() {
     // Uses the same path resolution logic as DependencyManager
     const claudeInstalled = isClaudeSdkAvailable();
-    const codexInstalled = isCodexSdkAvailable();
 
     return {
         claude: {
             installed: claudeInstalled,
             path: getPackageDirFromRoot(getSdkRootDir('claude-sdk'), '@anthropic-ai/claude-agent-sdk')
-        },
-        codex: {
-            installed: codexInstalled,
-            path: getPackageDirFromRoot(getSdkRootDir('codex-sdk'), '@openai/codex-sdk')
         }
     };
 }
@@ -350,7 +283,7 @@ export function clearSdkCache() {
 
 /**
  * Verify that the SDK is installed, throwing a user-friendly error if not
- * @param {string} provider - 'claude' or 'codex'
+ * @param {string} provider - 'claude'
  * @throws {Error} If the SDK is not installed
  */
 export function requireSdk(provider) {
@@ -358,13 +291,6 @@ export function requireSdk(provider) {
         const error = new Error('Claude Code SDK not installed. Please install via Settings > Dependencies.');
         error.code = 'SDK_NOT_INSTALLED';
         error.provider = 'claude';
-        throw error;
-    }
-
-    if (provider === 'codex' && !isCodexSdkAvailable()) {
-        const error = new Error('Codex SDK not installed. Please install via Settings > Dependencies.');
-        error.code = 'SDK_NOT_INSTALLED';
-        error.provider = 'codex';
         throw error;
     }
 }

@@ -20,15 +20,12 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: string | Record<string, string>) => ({
       'settings.configure': 'Configure',
       'settings.agent.title': 'Agent',
-      'settings.basic.streaming.label': 'Streaming',
-      'common.thinking': 'Thinking',
       'config.runtimeProvider.title': 'Switch provider',
       'config.runtimeProvider.empty': 'No providers',
       'config.runtimeProvider.loading': 'Loading providers',
       'config.runtimeProvider.switched': 'Provider switched to Proxy A',
       'settings.provider.localProviderName': 'Use local settings.json',
       'settings.provider.cliLoginProviderName': 'Use CLI login',
-      'settings.codexProvider.dialog.cliLoginProviderName': 'Use local Codex config',
     } as Record<string, string>)[key] ?? (typeof options === 'string' ? options : key),
   }),
 }));
@@ -37,9 +34,7 @@ describe('ConfigSelect runtime provider submenu', () => {
   beforeEach(() => {
     window.sendToJava = vi.fn();
     window.updateProviders = undefined;
-    window.updateCodexProviders = undefined;
     window.updateActiveProvider = undefined;
-    window.updateActiveCodexProvider = undefined;
   });
 
   it('switches Claude runtime providers from the configure menu', async () => {
@@ -47,8 +42,7 @@ describe('ConfigSelect runtime provider submenu', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Configure/i }));
     const providerMenuItem = screen.getByText('Switch provider').closest('.selector-option')!;
-    expect(providerMenuItem.previousElementSibling?.className).toContain('selector-divider');
-    expect(providerMenuItem.nextElementSibling?.className).toContain('selector-divider');
+    expect(providerMenuItem.previousElementSibling).toBeNull();
     fireEvent.mouseEnter(providerMenuItem);
 
     expect(window.sendToJava).toHaveBeenCalledWith('get_providers:');
@@ -70,30 +64,6 @@ describe('ConfigSelect runtime provider submenu', () => {
 
     expect(window.sendToJava).toHaveBeenCalledWith('switch_provider:{"id":"proxy-a"}');
     expect(await screen.findByText('Provider switched to Proxy A')).toBeTruthy();
-  });
-
-  it('switches Codex runtime providers from the configure menu', async () => {
-    render(<ConfigSelect currentProvider="codex" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Configure/i }));
-    fireEvent.mouseEnter(screen.getByText('Switch provider').closest('.selector-option')!);
-
-    expect(window.sendToJava).toHaveBeenCalledWith('get_codex_providers:');
-
-    act(() => {
-      window.updateCodexProviders?.(JSON.stringify([
-        { id: SPECIAL_PROVIDER_IDS.CODEX_CLI_LOGIN, name: 'hidden codex local', isActive: true },
-        { id: 'codex-proxy', name: 'Codex Proxy', remark: 'workspace config', isActive: false },
-      ]));
-    });
-
-    const submenu = await screen.findByRole('listbox');
-    expect(within(submenu).getByText('Use local Codex config')).toBeTruthy();
-    expect(within(submenu).getByText('Codex Proxy')).toBeTruthy();
-
-    fireEvent.click(within(submenu).getByText('Codex Proxy'));
-
-    expect(window.sendToJava).toHaveBeenCalledWith('switch_codex_provider:{"id":"codex-proxy"}');
   });
 
   it('refreshes selected provider when backend confirms active provider change', async () => {

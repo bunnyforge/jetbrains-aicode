@@ -7,30 +7,6 @@ export type {
   DeleteConfirmState,
 } from './useProviderManagement';
 
-export { useCodexProviderManagement } from './useCodexProviderManagement';
-export type {
-  UseCodexProviderManagementOptions,
-  UseCodexProviderManagementReturn,
-  CodexProviderDialogState,
-  DeleteCodexConfirmState,
-} from './useCodexProviderManagement';
-
-export { useAgentManagement } from './useAgentManagement';
-export type {
-  UseAgentManagementOptions,
-  UseAgentManagementReturn,
-  AgentDialogState,
-  DeleteAgentConfirmState,
-} from './useAgentManagement';
-
-export { usePromptManagement } from './usePromptManagement';
-export type {
-  UsePromptManagementOptions,
-  UsePromptManagementReturn,
-  PromptDialogState,
-  DeletePromptConfirmState,
-} from './usePromptManagement';
-
 export { useSettingsWindowCallbacks } from './useSettingsWindowCallbacks';
 export type { SettingsWindowCallbacksDeps } from './useSettingsWindowCallbacks';
 

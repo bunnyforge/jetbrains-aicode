@@ -1,25 +1,33 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { CodexCustomModel } from '../../../types/provider';
-import { validateCodexCustomModels } from '../../../types/provider';
+import type { ModelCapabilities } from '../../../services/openRouterCatalog';
 
-/**
- * Read plugin-level custom models from localStorage
- */
-function readPluginModels(storageKey: string): CodexCustomModel[] {
+export interface CustomModel {
+  id: string;
+  label?: string;
+  description?: string;
+  capabilities?: ModelCapabilities;
+}
+
+function readPluginModels(storageKey: string): CustomModel[] {
   try {
     const stored = localStorage.getItem(storageKey);
     if (!stored) return [];
     const parsed = JSON.parse(stored);
-    return validateCodexCustomModels(parsed);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((m): m is CustomModel => !!m && typeof m === 'object' && typeof m.id === 'string' && m.id.trim().length > 0)
+      .map(m => ({
+        id: m.id,
+        label: m.label,
+        description: m.description,
+        capabilities: m.capabilities && typeof m.capabilities === 'object' ? m.capabilities : undefined,
+      }));
   } catch {
     return [];
   }
 }
 
-/**
- * Write plugin-level custom models to localStorage and notify listeners
- */
-function writePluginModels(storageKey: string, models: CodexCustomModel[]) {
+function writePluginModels(storageKey: string, models: CustomModel[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(models));
     window.dispatchEvent(new CustomEvent('localStorageChange', { detail: { key: storageKey } }));
@@ -28,7 +36,6 @@ function writePluginModels(storageKey: string, models: CodexCustomModel[]) {
   }
 }
 
-/** Custom event detail shape for localStorageChange */
 interface LocalStorageChangeDetail {
   key: string;
 }
@@ -38,7 +45,7 @@ interface LocalStorageChangeDetail {
  * Listens for both native StorageEvent (cross-tab) and custom localStorageChange (same-tab) events.
  */
 export function usePluginModels(storageKey: string) {
-  const [models, setModels] = useState<CodexCustomModel[]>(() => readPluginModels(storageKey));
+  const [models, setModels] = useState<CustomModel[]>(() => readPluginModels(storageKey));
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -60,7 +67,7 @@ export function usePluginModels(storageKey: string) {
     };
   }, [storageKey]);
 
-  const updateModels = useCallback((newModels: CodexCustomModel[]) => {
+  const updateModels = useCallback((newModels: CustomModel[]) => {
     setModels(newModels);
     writePluginModels(storageKey, newModels);
   }, [storageKey]);

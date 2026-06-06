@@ -121,6 +121,44 @@ public class ClaudeHistoryReaderRefactorTest {
     }
 
     @Test
+    public void usageAggregatorReturnsZeroCostForThirdPartyResolvedModel() throws IOException {
+        Path projectsDir = Files.createTempDirectory("claude-history-thirdparty");
+        try {
+            Path projectDir = Files.createDirectories(projectsDir.resolve("demo-project"));
+            writeSessionFile(
+                    projectDir,
+                    "session-thirdparty",
+                    line(
+                            "2026-03-10T10:01:00Z",
+                            "assistant",
+                            "\"message\":{\"role\":\"assistant\",\"model\":\"claude-sonnet-4-6\","
+                                    + "\"usage\":{\"input_tokens\":1000,\"output_tokens\":250,"
+                                    + "\"cache_creation_input_tokens\":400,\"cache_read_input_tokens\":50}}"
+                    )
+            );
+
+            // Resolver maps the Claude alias to a non-Claude third-party model.
+            // The aggregator must NOT bill Claude rates for a session that was
+            // actually served by a third-party model.
+            ClaudeUsageAggregator aggregator = new ClaudeUsageAggregator(
+                    projectsDir,
+                    new ClaudeHistoryParser(),
+                    alias -> "minimax/m2.5"
+            );
+            ProjectStatistics stats = aggregator.getProjectStatistics("all", 0);
+
+            assertEquals(1, stats.totalSessions);
+            assertEquals(1700, stats.totalUsage.totalTokens);
+            // Third-party model has no Claude pricing data → cost is 0.
+            assertEquals(0.0, stats.estimatedCost, 0.0000001);
+            // Display name should reflect the resolved model, not the alias.
+            assertEquals("minimax/m2.5", stats.byModel.get(0).model);
+        } finally {
+            deleteDirectory(projectsDir);
+        }
+    }
+
+    @Test
     public void usageAggregatorDedupsDuplicateMessageIdLines() throws IOException {
         Path projectsDir = Files.createTempDirectory("claude-history-dedup");
         try {

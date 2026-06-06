@@ -8,7 +8,7 @@
 // ============================================================
 
 /**
- * File tag information for backend context injection (Codex mode)
+ * File tag information for backend context injection.
  */
 export interface FileTagInfo {
   /** Display path (as shown in tag) */
@@ -250,67 +250,17 @@ export interface ModelInfo {
   description?: string;
 }
 
-/**
- * Check if a model supports 1M context window.
- * All models support 1M except Haiku (matched by name substring).
- */
-export function modelSupports1MContext(modelId: string | undefined | null): boolean {
-  if (!modelId) {
-    return false;
-  }
-  return !modelId.replace(/\[1m\]$/i, '').toLowerCase().includes('haiku');
-}
-
-/**
- * Check if a model ID already has [1m] suffix.
- */
-export function has1MContextSuffix(modelId: string | undefined | null): boolean {
-  if (!modelId) {
-    return false;
-  }
-  return /\[1m\]$/i.test(modelId);
-}
-
-/**
- * Apply [1m] suffix to model ID if supported and enabled.
- * Returns the original model ID if the model doesn't support 1M context.
- */
-export function apply1MContextSuffix(modelId: string, enabled: boolean): string {
-  if (!enabled || !modelSupports1MContext(modelId)) {
-    // Remove any existing [1m] suffix if disabled
-    return modelId.replace(/\[1m\]$/i, '');
-  }
-  // Remove existing suffix first, then add new one
-  const baseId = modelId.replace(/\[1m\]$/i, '');
-  return `${baseId}[1m]`;
-}
-
-/**
- * Remove [1m] suffix from model ID for display/storage purposes.
- */
-export function strip1MContextSuffix(modelId: string | undefined | null): string {
-  if (!modelId) {
-    return '';
-  }
-  return modelId.replace(/\[1m\]$/i, '');
-}
-
-const LEGACY_CLAUDE_MODEL_ID_ALIASES: Record<string, string> = {
-  'claude-opus-4-6[1m]': 'claude-opus-4-6',
-};
-
 export function normalizeClaudeModelId(modelId: string | undefined | null): string {
   if (!modelId) {
     return 'claude-sonnet-4-6';
   }
-  // First strip any [1m] suffix
-  const stripped = strip1MContextSuffix(modelId);
-  return LEGACY_CLAUDE_MODEL_ID_ALIASES[stripped] ?? stripped;
+  return modelId;
 }
 
 /**
- * Claude model list (base IDs without [1m] suffix).
- * The 1M context suffix is applied dynamically via toggle.
+ * Claude model list. The 1M context convention (the `[1m]` suffix) is no
+ * longer used — the effective context window is now resolved automatically
+ * from the OpenRouter catalog (or the backend's own model registry).
  */
 export const CLAUDE_MODELS: ModelInfo[] = [
   {
@@ -341,57 +291,6 @@ export const CLAUDE_MODELS: ModelInfo[] = [
 ];
 
 /**
- * Codex model list
- */
-export const CODEX_MODELS: ModelInfo[] = [
-  {
-    id: 'gpt-5.5',
-    label: 'GPT-5.5',
-    description: 'Latest frontier model with stronger capabilities.',
-  },
-  {
-    id: 'gpt-5.4',
-    label: 'GPT-5.4',
-    description: 'Latest frontier model with enhanced capabilities.',
-  },
-  {
-    id: 'gpt-5.2-codex',
-    label: 'GPT-5.2-Codex',
-    description: 'Frontier agentic coding model.',
-  },
-  {
-    id: 'gpt-5.1-codex-max',
-    label: 'GPT-5.1-Codex-Max',
-    description: 'Codex-optimized flagship for deep and fast reasoning.',
-  },
-  {
-    id: 'gpt-5.4-mini',
-    label: 'GPT-5.4-Mini',
-    description: 'Smaller frontier agentic coding model.',
-  },
-  {
-    id: 'gpt-5.3-codex',
-    label: 'GPT-5.3-Codex',
-    description: 'Latest frontier agentic coding model with enhanced capabilities.',
-  },
-  {
-    id: 'gpt-5.3-codex-spark',
-    label: 'GPT-5.3-Codex-Spark',
-    description: 'Ultra-fast coding model.',
-  },
-  {
-    id: 'gpt-5.2',
-    label: 'GPT-5.2',
-    description: 'Optimized for professional work and long-running agents.',
-  },
-  {
-    id: 'gpt-5.1-codex-mini',
-    label: 'GPT-5.1-Codex-Mini',
-    description: 'Optimized for Codex. Cheaper, faster, but less capable.',
-  },
-];
-
-/**
  * Available models (backward compatibility)
  */
 export const AVAILABLE_MODELS = CLAUDE_MODELS;
@@ -411,9 +310,6 @@ export interface ProviderInfo {
  */
 export const AVAILABLE_PROVIDERS: ProviderInfo[] = [
   { id: 'claude', label: 'Claude Code', icon: 'codicon-terminal', enabled: true },
-  { id: 'codex', label: 'Codex', icon: 'codicon-terminal', enabled: true },
-  { id: 'gemini', label: 'Gemini Cli', icon: 'codicon-terminal', enabled: false },
-  { id: 'opencode', label: 'OpenCode', icon: 'codicon-terminal', enabled: false },
 ];
 
 /**
@@ -450,9 +346,8 @@ export const MAX_EFFORT_CLAUDE_MODELS = new Set([
 
 /**
  * Reasoning Effort (thinking depth)
- * Controls the depth of reasoning for AI models
+ * Controls the depth of reasoning for Claude models.
  * Claude API values: low, medium, high, xhigh, max
- * Codex API values: low, medium, high, xhigh
  */
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
@@ -537,7 +432,7 @@ export interface ChatInputBoxHandle {
   clear: () => void;
   /** Check if input has content */
   hasContent: () => boolean;
-  /** Get file tags from input (for Codex context injection) */
+  /** Get file tags from input (for context injection) */
   getFileTags: () => FileTagInfo[];
 }
 
@@ -597,6 +492,17 @@ export interface ChatInputBoxProps {
   onAddAttachment?: (files: FileList) => void;
   /** Remove attachment */
   onRemoveAttachment?: (id: string) => void;
+  /**
+   * Whether the active model accepts image input. When `false`, image
+   * paste/drop and the attach button are disabled. Defaults to `true`.
+   */
+  imageInputSupported?: boolean;
+  /**
+   * Callback fired when the user attempts to paste/drop an image or use
+   * the attach button on a model that does not support image input. The
+   * parent can use this to show a toast.
+   */
+  onUnsupportedImageAttempt?: () => void;
   /** Switch mode */
   onModeSelect?: (mode: PermissionMode) => void;
   /** Switch model */
@@ -609,10 +515,6 @@ export interface ChatInputBoxProps {
   onReasoningChange?: (effort: ReasoningEffort) => void;
   /** Toggle thinking mode */
   onToggleThinking?: (enabled: boolean) => void;
-  /** Whether streaming is enabled */
-  streamingEnabled?: boolean;
-  /** Toggle streaming */
-  onStreamingEnabledChange?: (enabled: boolean) => void;
 
   /** Send shortcut setting: 'enter' = Enter sends | 'cmdEnter' = Cmd/Ctrl+Enter sends */
   sendShortcut?: 'enter' | 'cmdEnter';
@@ -658,10 +560,6 @@ export interface ChatInputBoxProps {
   autoOpenFileEnabled?: boolean;
   /** Toggle auto open file enabled */
   onAutoOpenFileEnabledChange?: (enabled: boolean) => void;
-  /** Whether long context (1M) is enabled */
-  longContextEnabled?: boolean;
-  /** Toggle long context callback */
-  onLongContextChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -699,24 +597,8 @@ export interface ButtonAreaProps {
   alwaysThinkingEnabled?: boolean;
   /** Toggle thinking mode */
   onToggleThinking?: (enabled: boolean) => void;
-  /** Whether streaming enabled */
-  streamingEnabled?: boolean;
-  /** Toggle streaming */
-  onStreamingEnabledChange?: (enabled: boolean) => void;
-  /** Currently selected agent */
-  selectedAgent?: SelectedAgent | null;
-  /** Agent selection callback */
-  onAgentSelect?: (agent: SelectedAgent) => void;
-  /** Clear agent callback */
-  onClearAgent?: () => void;
-  /** Open agent settings callback */
-  onOpenAgentSettings?: () => void;
   /** Navigate to model management to add models */
   onAddModel?: () => void;
-  /** Whether long context (1M) is enabled */
-  longContextEnabled?: boolean;
-  /** Toggle long context callback */
-  onLongContextChange?: (enabled: boolean) => void;
 }
 
 /**

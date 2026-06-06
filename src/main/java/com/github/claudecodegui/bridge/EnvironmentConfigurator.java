@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,9 +35,6 @@ public class EnvironmentConfigurator {
     private final CodemossSettingsService settingsService;
     private volatile String cachedPermissionDir = null;
     private volatile String sessionId = null;
-
-    // Cache for Codex env_key values from config.toml
-    private volatile Map<String, String> cachedCodexEnvVars = null;
 
     public EnvironmentConfigurator() {
         this(new CodemossSettingsService());
@@ -363,140 +359,6 @@ public class EnvironmentConfigurator {
      */
     public void clearCache() {
         this.cachedPermissionDir = null;
-        this.cachedCodexEnvVars = null;
-    }
-
-    /**
-     * Configure Codex-specific environment variables.
-     * Reads ~/.codex/config.toml to find custom env_key settings and loads those
-     * environment variables from the system shell environment.
-     * <p>
-     * This is necessary because IDE processes often don't inherit shell environment
-     * variables set in ~/.zshrc or ~/.bash_profile when launched from Dock/launcher.
-     *
-     * @param env ProcessBuilder environment map to update
-     */
-    public void configureCodexEnv(Map<String, String> env) {
-        if (env == null) {
-            return;
-        }
-
-        try {
-            String accessMode = new CodemossSettingsService().getCodexRuntimeAccessMode();
-            if (CodemossSettingsService.CODEX_RUNTIME_ACCESS_INACTIVE.equals(accessMode)) {
-                LOG.debug("[Codex] Skipping env_key sync from ~/.codex/config.toml: local access is not authorized");
-                return;
-            }
-
-            // 1. Find all env_key names from ~/.codex/config.toml
-            Set<String> envKeyNames = parseCodexConfigEnvKeys();
-            if (envKeyNames.isEmpty()) {
-                LOG.debug("[Codex] No custom env_key found in config.toml");
-                return;
-            }
-
-            LOG.info("[Codex] Found env_key names in config.toml: " + envKeyNames);
-
-            // 2. Try to get values for each env_key from multiple sources
-            for (String envKeyName : envKeyNames) {
-                // Skip if already set in environment
-                if (env.containsKey(envKeyName) && env.get(envKeyName) != null && !env.get(envKeyName).isEmpty()) {
-                    LOG.debug("[Codex] Env var already set: " + envKeyName);
-                    continue;
-                }
-
-                // Try to get value from system
-                String value = resolveEnvValue(envKeyName);
-                if (value != null && !value.isEmpty()) {
-                    env.put(envKeyName, value);
-                    LOG.info("[Codex] Set env var from shell: " + envKeyName + " (length: " + value.length() + ")");
-                } else {
-                    LOG.warn("[Codex] Could not resolve env var: " + envKeyName +
-                                     ". Please ensure it's set in your shell environment.");
-                }
-            }
-        } catch (Exception e) {
-            LOG.warn("[Codex] Error configuring Codex env: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Parse ~/.codex/config.toml to extract all env_key values.
-     *
-     * @return Set of environment variable names referenced by env_key
-     */
-    private Set<String> parseCodexConfigEnvKeys() {
-        Set<String> envKeys = new HashSet<>();
-        String home = PlatformUtils.getHomeDirectory();
-        if (home == null || home.isEmpty()) {
-            return envKeys;
-        }
-
-        Path configPath = Paths.get(home, ".codex", "config.toml");
-        if (!Files.exists(configPath)) {
-            LOG.debug("[Codex] config.toml not found: " + configPath);
-            return envKeys;
-        }
-
-        try {
-            String content = Files.readString(configPath, StandardCharsets.UTF_8);
-
-            // Pattern to match: env_key = "VALUE" or env_key = 'VALUE'
-            Pattern pattern = Pattern.compile("env_key\\s*=\\s*[\"']([^\"']+)[\"']");
-            Matcher matcher = pattern.matcher(content);
-
-            while (matcher.find()) {
-                String envKeyName = matcher.group(1).trim();
-                if (!envKeyName.isEmpty()) {
-                    envKeys.add(envKeyName);
-                }
-            }
-        } catch (IOException e) {
-            LOG.warn("[Codex] Failed to read config.toml: " + e.getMessage());
-        }
-
-        return envKeys;
-    }
-
-    /**
-     * Resolve environment variable value from multiple sources.
-     * Order of precedence:
-     * 1. System.getenv() - already inherited env vars
-     * 2. Shell environment via subprocess (macOS/Linux)
-     * 3. Parse shell config files as fallback
-     *
-     * @param envName Environment variable name
-     * @return Value or null if not found
-     */
-    private String resolveEnvValue(String envName) {
-        // 1. Try System.getenv first (might already be inherited)
-        String value = System.getenv(envName);
-        if (value != null && !value.isEmpty()) {
-            LOG.debug("[Codex] Env var found via System.getenv: " + envName);
-            return value;
-        }
-
-        // 2. For macOS/Linux, try to get from shell environment
-        if (!PlatformUtils.isWindows()) {
-            value = getEnvFromShell(envName);
-            if (value != null && !value.isEmpty()) {
-                return value;
-            }
-        } else {
-            // Windows: try to get from shell environment via cmd
-            value = getEnvFromWindowsShell(envName);
-            if (value != null && !value.isEmpty()) {
-                return value;
-            }
-        }
-
-        // 3. Parse shell config files as last resort
-        value = parseEnvFromShellConfigs(envName);
-        if (value != null && !value.isEmpty()) {
-            return value;
-        }
-
-        return null;
     }
 
     /**

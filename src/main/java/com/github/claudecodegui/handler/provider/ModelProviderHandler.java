@@ -36,23 +36,6 @@ public class ModelProviderHandler {
         MODEL_CONTEXT_LIMITS.put("claude-opus-4-6[1m]", 1_000_000);
         // Haiku - no 1M context available
         MODEL_CONTEXT_LIMITS.put("claude-haiku-4-5", 200_000);
-        // Codex/GPT models
-        MODEL_CONTEXT_LIMITS.put("gpt-5.4", 1_000_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.4-mini", 400_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.3-codex", 258_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.2-codex", 258_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.2", 258_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.1", 128_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-5.1-codex", 128_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-4o", 128_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-4o-mini", 128_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-4-turbo", 128_000);
-        MODEL_CONTEXT_LIMITS.put("gpt-4", 8_192);
-        MODEL_CONTEXT_LIMITS.put("o3", 200_000);
-        MODEL_CONTEXT_LIMITS.put("o3-mini", 200_000);
-        MODEL_CONTEXT_LIMITS.put("o1", 200_000);
-        MODEL_CONTEXT_LIMITS.put("o1-mini", 128_000);
-        MODEL_CONTEXT_LIMITS.put("o1-preview", 128_000);
     }
 
     private final HandlerContext context;
@@ -67,11 +50,25 @@ public class ModelProviderHandler {
     public void handleSetModel(String content) {
         try {
             String model = content;
+            Integer explicitContextWindow = null;
+            String explicitResolvedModel = null;
             if (content != null && !content.isEmpty()) {
                 try {
                     JsonObject json = gson.fromJson(content, JsonObject.class);
                     if (json.has("model")) {
                         model = json.get("model").getAsString();
+                    }
+                    if (json.has("contextWindow") && !json.get("contextWindow").isJsonNull()) {
+                        int cw = json.get("contextWindow").getAsInt();
+                        if (cw > 0) {
+                            explicitContextWindow = cw;
+                        }
+                    }
+                    if (json.has("resolvedModel") && !json.get("resolvedModel").isJsonNull()) {
+                        String rm = json.get("resolvedModel").getAsString();
+                        if (rm != null && !rm.isEmpty()) {
+                            explicitResolvedModel = rm;
+                        }
                     }
                 } catch (Exception e) {
                     // content itself is the model
@@ -88,11 +85,19 @@ public class ModelProviderHandler {
 
             com.github.claudecodegui.notifications.ClaudeNotifier.setModel(context.getProject(), model);
 
-            String resolvedModelForUsage = resolveConfiguredClaudeModelFromSettings(model);
-            int newMaxTokens = getModelContextLimit(resolvedModelForUsage);
+            String resolvedModelForUsage = explicitResolvedModel != null
+                    ? explicitResolvedModel
+                    : resolveConfiguredClaudeModelFromSettings(model);
+            int newMaxTokens = resolveModelContextLimit(resolvedModelForUsage, explicitContextWindow);
             LOG.info("[ModelProviderHandler] Model context limit: " + newMaxTokens
                     + " tokens for selected model: " + model
-                    + ", resolved model: " + resolvedModelForUsage);
+                    + ", resolved model: " + resolvedModelForUsage
+                    + (explicitContextWindow != null
+                        ? ", explicit contextWindow override: " + explicitContextWindow
+                        : "")
+                    + (explicitResolvedModel != null
+                        ? ", explicit resolvedModel override: " + explicitResolvedModel
+                        : ""));
 
             final String confirmedModel = model;
             final String confirmedProvider = context.getCurrentProvider();
@@ -153,9 +158,8 @@ public class ModelProviderHandler {
      * tab provider transitions from {@code previousProvider} to {@code newProvider}?
      *
      * <p>Returns true only on Claude → non-Claude transitions. Same-direction
-     * reaffirmations (e.g. {@code set_provider("codex")} fired again on every
-     * message send) must not restart the daemon, and Claude → Claude
-     * reaffirmations must keep the warm daemon alive.
+     * reaffirmations and Claude → Claude reaffirmations must keep the warm
+     * daemon alive.
      *
      * <p>Package-private so unit tests can verify the full transition matrix
      * without spinning up a HandlerContext or ClaudeSDKBridge.
@@ -240,21 +244,9 @@ public class ModelProviderHandler {
             var commands = SlashCommandRegistry.getCommands(provider, finalCwd, currentFilePath);
             String json = SlashCommandRegistry.toJson(commands);
 
-            final String codexJson;
-            if ("codex".equalsIgnoreCase(provider)) {
-                var codexSkills = SlashCommandRegistry.getCodexSkills(finalCwd);
-                codexJson = SlashCommandRegistry.toJson(codexSkills);
-                LOG.info("[ModelProviderHandler] Codex skills refreshed: " + codexSkills.size() + " skills");
-            } else {
-                codexJson = null;
-            }
-
             ApplicationManager.getApplication().invokeLater(() -> {
                 try {
                     context.callJavaScript("updateSlashCommands", context.escapeJs(json));
-                    if (codexJson != null) {
-                        context.callJavaScript("window.updateDollarCommands", context.escapeJs(codexJson));
-                    }
                 } catch (Exception e) {
                     LOG.warn("[ModelProviderHandler] Failed to refresh slash commands: " + e.getMessage());
                 }
@@ -279,7 +271,7 @@ public class ModelProviderHandler {
         return baseModel;
     }
 
-    static String resolveConfiguredClaudeModel(String baseModel, JsonObject env) {
+    public static String resolveConfiguredClaudeModel(String baseModel, JsonObject env) {
         if (baseModel == null || baseModel.isEmpty() || env == null) {
             return baseModel;
         }
@@ -326,6 +318,22 @@ public class ModelProviderHandler {
     }
 
     public static int getModelContextLimit(String model) {
+        return resolveModelContextLimit(model, null);
+    }
+
+    /**
+     * Resolve the context window for a model id, optionally with an explicit
+     * override (typically provided by the webview after an OpenRouter catalog
+     * lookup). Priority:
+     *   1. {@code explicitContextWindow} (if positive) — from OpenRouter
+     *   2. {@code [1m]/[200k]} suffix regex on the model id
+     *   3. {@link #MODEL_CONTEXT_LIMITS} hardcoded table
+     *   4. 200,000 default
+     */
+    public static int resolveModelContextLimit(String model, Integer explicitContextWindow) {
+        if (explicitContextWindow != null && explicitContextWindow > 0) {
+            return explicitContextWindow;
+        }
         if (model == null || model.isEmpty()) {
             return 200_000;
         }

@@ -1,10 +1,9 @@
 package com.github.claudecodegui.session;
 
-import com.github.claudecodegui.i18n.ClaudeCodeGuiBundle;
 import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.notifications.ClaudeNotifier;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.opencode.OpencodeSDKBridge;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
@@ -27,7 +26,7 @@ public class SessionSendService {
     private final MessageMerger messageMerger;
     private final Gson gson;
     private final ClaudeSDKBridge claudeSDKBridge;
-    private final CodexSDKBridge codexSDKBridge;
+    private final OpencodeSDKBridge opencodeSDKBridge;
     private final SessionContextService contextService;
 
     public SessionSendService(
@@ -38,7 +37,7 @@ public class SessionSendService {
             MessageMerger messageMerger,
             Gson gson,
             ClaudeSDKBridge claudeSDKBridge,
-            CodexSDKBridge codexSDKBridge,
+            OpencodeSDKBridge opencodeSDKBridge,
             SessionContextService contextService
     ) {
         this.project = project;
@@ -48,7 +47,7 @@ public class SessionSendService {
         this.messageMerger = messageMerger;
         this.gson = gson;
         this.claudeSDKBridge = claudeSDKBridge;
-        this.codexSDKBridge = codexSDKBridge;
+        this.opencodeSDKBridge = opencodeSDKBridge;
         this.contextService = contextService;
     }
 
@@ -99,7 +98,6 @@ public class SessionSendService {
         String sessionModeBeforeSend = state.getPermissionMode();
         String normalizedRequestedMode = normalizeRequestedPermissionMode(requestedPermissionMode);
         String effectivePermissionMode = resolveEffectivePermissionMode(
-                currentProvider,
                 normalizedRequestedMode,
                 sessionModeBeforeSend
         );
@@ -112,15 +110,12 @@ public class SessionSendService {
         );
 
         if ("codex".equals(currentProvider)) {
-            return sendToCodex(
-                    channelId,
-                    input,
-                    attachments,
-                    openedFilesJson,
-                    agentPrompt,
-                    fileTagPaths,
-                    effectivePermissionMode
-            );
+            LOG.warn("[ModeSync][Backend] Codex provider is no longer supported, falling back to Claude");
+        }
+
+        if ("opencode".equals(currentProvider)) {
+            LOG.info("[Provider] Routing to OpenCode bridge (baseUrl-driven protocol conversion at the Node layer)");
+            return sendToOpencode(channelId, input, attachments, openedFilesJson, agentPrompt);
         }
 
         return sendToClaude(channelId, input, attachments, openedFilesJson, agentPrompt, effectivePermissionMode);
@@ -141,7 +136,7 @@ public class SessionSendService {
         return null;
     }
 
-    public static String resolveEffectivePermissionMode(String provider, String requestedMode, String sessionMode) {
+    public static String resolveEffectivePermissionMode(String requestedMode, String sessionMode) {
         String resolvedMode = requestedMode;
         if (resolvedMode == null) {
             resolvedMode = normalizeRequestedPermissionMode(sessionMode);
@@ -149,59 +144,11 @@ public class SessionSendService {
         if (resolvedMode == null) {
             resolvedMode = "default";
         }
-
-        if ("codex".equals(provider) && "plan".equals(resolvedMode)) {
-            return "default";
-        }
         return resolvedMode;
     }
 
     public static String getCodexRuntimeAccessError(String accessMode) {
-        if (CodemossSettingsService.CODEX_RUNTIME_ACCESS_MANAGED.equals(accessMode)
-                || CodemossSettingsService.CODEX_RUNTIME_ACCESS_CLI_LOGIN.equals(accessMode)) {
-            return null;
-        }
-        return ClaudeCodeGuiBundle.message("error.codexLocalAccessNotAuthorized");
-    }
-
-    private CompletableFuture<Void> sendToCodex(
-            String channelId,
-            String input,
-            List<ClaudeSession.Attachment> attachments,
-            JsonObject openedFilesJson,
-            String agentPrompt,
-            List<String> fileTagPaths,
-            String effectivePermissionMode
-    ) {
-        CodexMessageHandler handler = new CodexMessageHandler(state, callbackFacade.getCallbackHandler());
-        String accessMode = CodemossSettingsService.CODEX_RUNTIME_ACCESS_INACTIVE;
-        try {
-            accessMode = new CodemossSettingsService().getCodexRuntimeAccessMode();
-        } catch (Exception e) {
-            LOG.warn("[Codex] Failed to resolve runtime access mode: " + e.getMessage());
-        }
-
-        String accessError = getCodexRuntimeAccessError(accessMode);
-        if (accessError != null) {
-            handler.onError(accessError);
-            return CompletableFuture.completedFuture(null);
-        }
-
-        String contextAppend = contextService.buildCodexContextAppend(openedFilesJson, fileTagPaths);
-        String finalInput = (input != null ? input : "") + contextAppend;
-
-        return codexSDKBridge.sendMessage(
-                channelId,
-                finalInput,
-                state.getSessionId(),
-                state.getCwd(),
-                attachments,
-                effectivePermissionMode,
-                state.getModel(),
-                agentPrompt,
-                state.getReasoningEffort(),
-                handler
-        ).thenApply(result -> null);
+        return null;
     }
 
     private CompletableFuture<Void> sendToClaude(
@@ -243,6 +190,48 @@ public class SessionSendService {
                         streaming,
                         false,
                         state.getReasoningEffort(),
+                        handler
+                ).thenApply(result -> null);
+    }
+
+    private CompletableFuture<Void> sendToOpencode(
+            String channelId,
+            String input,
+            List<ClaudeSession.Attachment> attachments,
+            JsonObject openedFilesJson,
+            String agentPrompt
+    ) {
+        ClaudeMessageHandler handler = new ClaudeMessageHandler(
+                project,
+                state,
+                callbackFacade.getCallbackHandler(),
+                messageParser,
+                messageMerger,
+                gson
+        );
+
+        final String currentModel = state.getModel();
+        LOG.info("[Lifecycle] sendToOpencode sessionId=" + (state.getSessionId() != null ? state.getSessionId() : "(new)")
+                + ", cwd=" + state.getCwd()
+                + ", model=" + currentModel);
+
+        // The opencode Node channel is stateless — it does not consume
+        // attachments, agent prompts, opened files, or permission mode.
+        // Streaming is always on (the opencode upstream is SSE-only).
+        // disableThinking is wired through the user-facing toggle if the
+        // state carries one; otherwise left null.
+        Boolean disableThinking = null;
+        return opencodeSDKBridge.sendMessage(
+                        channelId,
+                        input,
+                        state.getSessionId(),
+                        state.getCwd(),
+                        currentModel,
+                        null,   // systemPrompt — the opencode preset does not configure one
+                        null,   // temperature
+                        null,   // maxTokens
+                        null,   // topP
+                        disableThinking,
                         handler
                 ).thenApply(result -> null);
     }

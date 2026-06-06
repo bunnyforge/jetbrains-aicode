@@ -35,8 +35,6 @@ public class CodemossSettingsService {
 
     private static final Logger LOG = Logger.getInstance(CodemossSettingsService.class);
     private static final int CONFIG_VERSION = 2;
-    private static final String CODEX_SANDBOX_MODE_WORKSPACE_WRITE = "workspace-write";
-    private static final String CODEX_SANDBOX_MODE_DANGER_FULL_ACCESS = "danger-full-access";
     private static final String UI_FONT_CONFIG_KEY = "uiFont";
     private static final String CODE_FONT_CONFIG_KEY = "codeFont";
     // Shared by both UI font and code font: the persisted JSON keys ("mode" /
@@ -48,9 +46,6 @@ public class CodemossSettingsService {
             FontConfigService.UI_FONT_MODE_FOLLOW_EDITOR,
             FontConfigService.UI_FONT_MODE_CUSTOM_FILE
     );
-    public static final String CODEX_RUNTIME_ACCESS_INACTIVE = "inactive";
-    public static final String CODEX_RUNTIME_ACCESS_MANAGED = "managed";
-    public static final String CODEX_RUNTIME_ACCESS_CLI_LOGIN = "cli_login";
     private static final String COMMIT_AI_KEY = "commitAi";
     private static final String PROMPT_ENHANCER_KEY = "promptEnhancer";
     private static final String AI_FEATURE_PROVIDER_KEY = "provider";
@@ -59,14 +54,11 @@ public class CodemossSettingsService {
     private static final String AI_FEATURE_RESOLUTION_SOURCE_KEY = "resolutionSource";
     private static final String AI_FEATURE_AVAILABILITY_KEY = "availability";
     private static final String AI_FEATURE_PROVIDER_CLAUDE = "claude";
-    private static final String AI_FEATURE_PROVIDER_CODEX = "codex";
     private static final String AI_FEATURE_RESOLUTION_MANUAL = "manual";
     private static final String AI_FEATURE_RESOLUTION_AUTO = "auto";
     private static final String AI_FEATURE_RESOLUTION_UNAVAILABLE = "unavailable";
     private static final String DEFAULT_PROMPT_ENHANCER_CLAUDE_MODEL = "claude-sonnet-4-6";
-    private static final String DEFAULT_PROMPT_ENHANCER_CODEX_MODEL = "gpt-5.5";
     private static final String DEFAULT_COMMIT_AI_CLAUDE_MODEL = "claude-sonnet-4-6";
-    private static final String DEFAULT_COMMIT_AI_CODEX_MODEL = "gpt-5.5";
     private static final String USER_LANGUAGE_CONFIG_KEY = "language";
 
     private final Gson gson;
@@ -74,14 +66,11 @@ public class CodemossSettingsService {
     // Managers
     private final ConfigPathManager pathManager;
     private final ClaudeSettingsManager claudeSettingsManager;
-    private final CodexSettingsManager codexSettingsManager;
-    private final CodexMcpServerManager codexMcpServerManager;
     private final WorkingDirectoryManager workingDirectoryManager;
     private final AgentManager agentManager;
     private final SkillManager skillManager;
     private final McpServerManager mcpServerManager;
     private final ProviderManager providerManager;
-    private final CodexProviderManager codexProviderManager;
 
     public CodemossSettingsService() {
         this.gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
@@ -172,33 +161,6 @@ public class CodemossSettingsService {
                 pathManager,
                 claudeSettingsManager
         );
-
-        // Initialize CodexSettingsManager
-        this.codexSettingsManager = new CodexSettingsManager(gson);
-
-        // Initialize CodexMcpServerManager
-        this.codexMcpServerManager = new CodexMcpServerManager(codexSettingsManager);
-
-        // Initialize CodexProviderManager
-        this.codexProviderManager = new CodexProviderManager(
-                gson,
-                (ignored) -> {
-                    try {
-                        return readConfig();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                },
-                (config) -> {
-                    try {
-                        writeConfig(config);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                },
-                pathManager,
-                codexSettingsManager
-        );
     }
 
     // ==================== Basic Config Management ====================
@@ -276,12 +238,6 @@ public class CodemossSettingsService {
         claude.addProperty("current", "");
         claude.add("providers", providers);
         config.add("claude", claude);
-
-        JsonObject codex = new JsonObject();
-        codex.addProperty("current", "");
-        codex.add("providers", new JsonObject());
-        codex.addProperty("localConfigAuthorized", false);
-        config.add("codex", codex);
 
         return config;
     }
@@ -749,76 +705,6 @@ public class CodemossSettingsService {
         LOG.info("[CodemossSettings] Set auto open file enabled to " + enabled + " for project: " + projectPath);
     }
 
-    // ==================== Codex Sandbox Mode Config Management ====================
-
-    /**
-     * Get Codex sandbox mode configuration.
-     *
-     * @param projectPath project path
-     * @return sandbox mode (workspace-write or danger-full-access)
-     */
-    public String getCodexSandboxMode(String projectPath) throws IOException {
-        JsonObject config = readConfig();
-        String defaultMode = getDefaultCodexSandboxMode();
-
-        if (!config.has("codexSandboxMode")) {
-            return defaultMode;
-        }
-
-        JsonObject sandboxConfig = config.getAsJsonObject("codexSandboxMode");
-
-        if (projectPath != null && sandboxConfig.has(projectPath)) {
-            String mode = sandboxConfig.get(projectPath).getAsString();
-            return isValidCodexSandboxMode(mode) ? mode : defaultMode;
-        }
-
-        if (sandboxConfig.has("default")) {
-            String mode = sandboxConfig.get("default").getAsString();
-            return isValidCodexSandboxMode(mode) ? mode : defaultMode;
-        }
-
-        return defaultMode;
-    }
-
-    /**
-     * Set Codex sandbox mode configuration.
-     *
-     * @param projectPath project path
-     * @param sandboxMode sandbox mode (workspace-write or danger-full-access)
-     */
-    public void setCodexSandboxMode(String projectPath, String sandboxMode) throws IOException {
-        if (!isValidCodexSandboxMode(sandboxMode)) {
-            throw new IllegalArgumentException("Invalid Codex sandbox mode: " + sandboxMode);
-        }
-
-        JsonObject config = readConfig();
-
-        JsonObject sandboxConfig;
-        if (config.has("codexSandboxMode")) {
-            sandboxConfig = config.getAsJsonObject("codexSandboxMode");
-        } else {
-            sandboxConfig = new JsonObject();
-            config.add("codexSandboxMode", sandboxConfig);
-        }
-
-        if (projectPath != null) {
-            sandboxConfig.addProperty(projectPath, sandboxMode);
-        }
-        sandboxConfig.addProperty("default", sandboxMode);
-
-        writeConfig(config);
-        LOG.info("[CodemossSettings] Set Codex sandbox mode to " + sandboxMode + " for project: " + projectPath);
-    }
-
-    private boolean isValidCodexSandboxMode(String mode) {
-        return CODEX_SANDBOX_MODE_WORKSPACE_WRITE.equals(mode)
-                || CODEX_SANDBOX_MODE_DANGER_FULL_ACCESS.equals(mode);
-    }
-
-    private String getDefaultCodexSandboxMode() {
-        return CODEX_SANDBOX_MODE_DANGER_FULL_ACCESS;
-    }
-
     // ==================== Provider Management ====================
 
     public List<JsonObject> getClaudeProviders() throws IOException {
@@ -901,28 +787,6 @@ public class CodemossSettingsService {
 
     public Map<String, Object> validateMcpServer(JsonObject server) {
         return mcpServerManager.validateMcpServer(server);
-    }
-
-    // ==================== Codex MCP Server Management ====================
-
-    public CodexMcpServerManager getCodexMcpServerManager() {
-        return codexMcpServerManager;
-    }
-
-    public List<JsonObject> getCodexMcpServers() throws IOException {
-        return codexMcpServerManager.getMcpServers();
-    }
-
-    public void upsertCodexMcpServer(JsonObject server) throws IOException {
-        codexMcpServerManager.upsertMcpServer(server);
-    }
-
-    public boolean deleteCodexMcpServer(String serverId) throws IOException {
-        return codexMcpServerManager.deleteMcpServer(serverId);
-    }
-
-    public Map<String, Object> validateCodexMcpServer(JsonObject server) {
-        return codexMcpServerManager.validateMcpServer(server);
     }
 
     // ==================== Skills Management ====================
@@ -1434,8 +1298,7 @@ public class CodemossSettingsService {
     public JsonObject getPromptEnhancerConfig() throws IOException {
         return getAiFeatureConfig(
                 PROMPT_ENHANCER_KEY,
-                DEFAULT_PROMPT_ENHANCER_CLAUDE_MODEL,
-                DEFAULT_PROMPT_ENHANCER_CODEX_MODEL
+                DEFAULT_PROMPT_ENHANCER_CLAUDE_MODEL
         );
     }
 
@@ -1444,16 +1307,13 @@ public class CodemossSettingsService {
      *
      * @param provider manual provider override, null/blank to restore auto mode
      * @param claudeModel remembered Claude enhancer model
-     * @param codexModel remembered Codex enhancer model
      */
-    public void setPromptEnhancerConfig(String provider, String claudeModel, String codexModel) throws IOException {
+    public void setPromptEnhancerConfig(String provider, String claudeModel) throws IOException {
         setAiFeatureConfig(
                 PROMPT_ENHANCER_KEY,
                 provider,
                 claudeModel,
-                codexModel,
                 DEFAULT_PROMPT_ENHANCER_CLAUDE_MODEL,
-                DEFAULT_PROMPT_ENHANCER_CODEX_MODEL,
                 "prompt enhancer"
         );
     }
@@ -1461,27 +1321,23 @@ public class CodemossSettingsService {
     public JsonObject getCommitAiConfig() throws IOException {
         return getAiFeatureConfig(
                 COMMIT_AI_KEY,
-                DEFAULT_COMMIT_AI_CLAUDE_MODEL,
-                DEFAULT_COMMIT_AI_CODEX_MODEL
+                DEFAULT_COMMIT_AI_CLAUDE_MODEL
         );
     }
 
-    public void setCommitAiConfig(String provider, String claudeModel, String codexModel) throws IOException {
+    public void setCommitAiConfig(String provider, String claudeModel) throws IOException {
         setAiFeatureConfig(
                 COMMIT_AI_KEY,
                 provider,
                 claudeModel,
-                codexModel,
                 DEFAULT_COMMIT_AI_CLAUDE_MODEL,
-                DEFAULT_COMMIT_AI_CODEX_MODEL,
                 "commit AI"
         );
     }
 
     private JsonObject getAiFeatureConfig(
             String featureKey,
-            String defaultClaudeModel,
-            String defaultCodexModel
+            String defaultClaudeModel
     ) throws IOException {
         JsonObject rootConfig = readConfig();
         JsonObject featureConfig = getAiFeatureRootObject(rootConfig, featureKey);
@@ -1490,14 +1346,12 @@ public class CodemossSettingsService {
                         ? featureConfig.get(AI_FEATURE_PROVIDER_KEY).getAsString()
                         : null
         );
-        JsonObject models = getNormalizedAiFeatureModels(featureConfig, defaultClaudeModel, defaultCodexModel);
+        JsonObject models = getNormalizedAiFeatureModels(featureConfig, defaultClaudeModel);
         JsonObject availability = buildAiFeatureAvailability();
         boolean claudeAvailable = availability.get(AI_FEATURE_PROVIDER_CLAUDE).getAsBoolean();
-        boolean codexAvailable = availability.get(AI_FEATURE_PROVIDER_CODEX).getAsBoolean();
         ResolvedAiFeatureProvider resolvedProvider = resolveAiFeatureProvider(
                 manualProvider,
-                claudeAvailable,
-                codexAvailable
+                claudeAvailable
         );
 
         JsonObject response = new JsonObject();
@@ -1521,9 +1375,7 @@ public class CodemossSettingsService {
             String featureKey,
             String provider,
             String claudeModel,
-            String codexModel,
             String defaultClaudeModel,
-            String defaultCodexModel,
             String featureLabel
     ) throws IOException {
         JsonObject config = readConfig();
@@ -1536,7 +1388,7 @@ public class CodemossSettingsService {
         }
         featureConfig.add(
                 AI_FEATURE_MODELS_KEY,
-                createAiFeatureModels(claudeModel, codexModel, defaultClaudeModel, defaultCodexModel)
+                createAiFeatureModels(claudeModel, defaultClaudeModel)
         );
 
         config.add(featureKey, featureConfig);
@@ -1554,17 +1406,16 @@ public class CodemossSettingsService {
     private JsonObject buildAiFeatureAvailability() {
         JsonObject availability = new JsonObject();
         availability.addProperty(AI_FEATURE_PROVIDER_CLAUDE, isAiFeatureProviderAvailable(AI_FEATURE_PROVIDER_CLAUDE));
-        availability.addProperty(AI_FEATURE_PROVIDER_CODEX, isAiFeatureProviderAvailable(AI_FEATURE_PROVIDER_CODEX));
         return availability;
     }
 
     private boolean isAiFeatureProviderAvailable(String provider) {
         try {
             DependencyManager dependencyManager = new DependencyManager();
-            if (AI_FEATURE_PROVIDER_CODEX.equals(provider)) {
-                return getActiveCodexProvider() != null && dependencyManager.isInstalled("codex-sdk");
+            if (AI_FEATURE_PROVIDER_CLAUDE.equals(provider)) {
+                return getActiveClaudeProvider() != null && dependencyManager.isInstalled("claude-sdk");
             }
-            return getActiveClaudeProvider() != null && dependencyManager.isInstalled("claude-sdk");
+            return false;
         } catch (Exception e) {
             LOG.warn("[CodemossSettings] Failed to resolve AI feature availability for " + provider + ": " + e.getMessage());
             return false;
@@ -1573,8 +1424,7 @@ public class CodemossSettingsService {
 
     private JsonObject getNormalizedAiFeatureModels(
             JsonObject featureConfig,
-            String defaultClaudeModel,
-            String defaultCodexModel
+            String defaultClaudeModel
     ) {
         if (featureConfig != null
                 && featureConfig.has(AI_FEATURE_MODELS_KEY)
@@ -1583,48 +1433,32 @@ public class CodemossSettingsService {
             String claudeModel = rawModels.has(AI_FEATURE_PROVIDER_CLAUDE) && !rawModels.get(AI_FEATURE_PROVIDER_CLAUDE).isJsonNull()
                     ? rawModels.get(AI_FEATURE_PROVIDER_CLAUDE).getAsString()
                     : null;
-            String codexModel = rawModels.has(AI_FEATURE_PROVIDER_CODEX) && !rawModels.get(AI_FEATURE_PROVIDER_CODEX).isJsonNull()
-                    ? rawModels.get(AI_FEATURE_PROVIDER_CODEX).getAsString()
-                    : null;
-            return createAiFeatureModels(claudeModel, codexModel, defaultClaudeModel, defaultCodexModel);
+            return createAiFeatureModels(claudeModel, defaultClaudeModel);
         }
-        return createAiFeatureModels(null, null, defaultClaudeModel, defaultCodexModel);
+        return createAiFeatureModels(null, defaultClaudeModel);
     }
 
     private JsonObject createAiFeatureModels(
             String claudeModel,
-            String codexModel,
-            String defaultClaudeModel,
-            String defaultCodexModel
+            String defaultClaudeModel
     ) {
         JsonObject models = new JsonObject();
         models.addProperty(
                 AI_FEATURE_PROVIDER_CLAUDE,
                 normalizeAiFeatureModel(claudeModel, defaultClaudeModel)
         );
-        models.addProperty(
-                AI_FEATURE_PROVIDER_CODEX,
-                normalizeAiFeatureModel(codexModel, defaultCodexModel)
-        );
         return models;
     }
 
     private ResolvedAiFeatureProvider resolveAiFeatureProvider(
             String manualProvider,
-            boolean claudeAvailable,
-            boolean codexAvailable
+            boolean claudeAvailable
     ) {
         if (manualProvider != null) {
-            boolean manualProviderAvailable = AI_FEATURE_PROVIDER_CODEX.equals(manualProvider)
-                    ? codexAvailable
-                    : claudeAvailable;
-            if (manualProviderAvailable) {
+            if (claudeAvailable) {
                 return new ResolvedAiFeatureProvider(manualProvider, AI_FEATURE_RESOLUTION_MANUAL);
             }
             return new ResolvedAiFeatureProvider(null, AI_FEATURE_RESOLUTION_UNAVAILABLE);
-        }
-        if (codexAvailable) {
-            return new ResolvedAiFeatureProvider(AI_FEATURE_PROVIDER_CODEX, AI_FEATURE_RESOLUTION_AUTO);
         }
         if (claudeAvailable) {
             return new ResolvedAiFeatureProvider(AI_FEATURE_PROVIDER_CLAUDE, AI_FEATURE_RESOLUTION_AUTO);
@@ -1640,7 +1474,7 @@ public class CodemossSettingsService {
         if (normalized.isEmpty()) {
             return null;
         }
-        if (AI_FEATURE_PROVIDER_CLAUDE.equals(normalized) || AI_FEATURE_PROVIDER_CODEX.equals(normalized)) {
+        if (AI_FEATURE_PROVIDER_CLAUDE.equals(normalized)) {
             return normalized;
         }
         return null;
@@ -1662,140 +1496,5 @@ public class CodemossSettingsService {
             this.effectiveProvider = effectiveProvider;
             this.resolutionSource = resolutionSource;
         }
-    }
-
-    // ==================== Codex Provider Management ====================
-
-    public List<JsonObject> getCodexProviders() throws IOException {
-        return codexProviderManager.getCodexProviders();
-    }
-
-    public JsonObject getActiveCodexProvider() throws IOException {
-        return codexProviderManager.getActiveCodexProvider();
-    }
-
-    public void addCodexProvider(JsonObject provider) throws IOException {
-        codexProviderManager.addCodexProvider(provider);
-    }
-
-    public void saveCodexProvider(JsonObject provider) throws IOException {
-        codexProviderManager.saveCodexProvider(provider);
-    }
-
-    public void updateCodexProvider(String id, JsonObject updates) throws IOException {
-        codexProviderManager.updateCodexProvider(id, updates);
-    }
-
-    public DeleteResult deleteCodexProvider(String id) {
-        return codexProviderManager.deleteCodexProvider(id);
-    }
-
-    public void switchCodexProvider(String id) throws IOException {
-        codexProviderManager.switchCodexProvider(id);
-    }
-
-    public void applyActiveProviderToCodexSettings() throws IOException {
-        codexProviderManager.applyActiveProviderToCodexSettings();
-    }
-
-    public JsonObject getCurrentCodexConfig() throws IOException {
-        if (!isCodexLocalConfigAuthorized()) {
-            return new JsonObject();
-        }
-        return codexProviderManager.getCurrentCodexConfig();
-    }
-
-    public boolean isCodexCliLoginAvailable() {
-        try {
-            if (!isCodexLocalConfigAuthorized()) {
-                return false;
-            }
-            return codexSettingsManager.isCodexCliLoginAvailable();
-        } catch (IOException e) {
-            LOG.warn("[CodemossSettings] Failed to check Codex local authorization: " + e.getMessage());
-            return false;
-        }
-    }
-
-    public void applyCodexCliLoginToSettings() throws IOException {
-        codexSettingsManager.applyCodexCliLoginToSettings();
-    }
-
-    public void removeCodexCliLoginFromSettings() throws IOException {
-        codexSettingsManager.removeCodexCliLoginFromSettings();
-    }
-
-    public JsonObject readCodexCliLoginAccountInfo() {
-        try {
-            if (!isCodexLocalConfigAuthorized()) {
-                return null;
-            }
-            return codexSettingsManager.readCodexCliLoginAccountInfo();
-        } catch (IOException e) {
-            LOG.warn("[CodemossSettings] Failed to read Codex local authorization state: " + e.getMessage());
-            return null;
-        }
-    }
-
-    public boolean isCodexLocalConfigAuthorized() throws IOException {
-        JsonObject config = readConfig();
-        if (!config.has("codex") || !config.get("codex").isJsonObject()) {
-            return false;
-        }
-        JsonObject codex = config.getAsJsonObject("codex");
-        return codex.has("localConfigAuthorized")
-                && !codex.get("localConfigAuthorized").isJsonNull()
-                && codex.get("localConfigAuthorized").getAsBoolean();
-    }
-
-    public void setCodexLocalConfigAuthorized(boolean authorized) throws IOException {
-        JsonObject config = readConfig();
-        JsonObject codex;
-        if (config.has("codex") && config.get("codex").isJsonObject()) {
-            codex = config.getAsJsonObject("codex");
-        } else {
-            codex = new JsonObject();
-            codex.add("providers", new JsonObject());
-            codex.addProperty("current", "");
-            config.add("codex", codex);
-        }
-
-        codex.addProperty("localConfigAuthorized", authorized);
-        writeConfig(config);
-    }
-
-    public String getCodexRuntimeAccessMode() throws IOException {
-        JsonObject config = readConfig();
-        if (!config.has("codex") || !config.get("codex").isJsonObject()) {
-            return CODEX_RUNTIME_ACCESS_INACTIVE;
-        }
-
-        JsonObject codex = config.getAsJsonObject("codex");
-        String currentId = codex.has("current") && !codex.get("current").isJsonNull()
-                ? codex.get("current").getAsString().trim()
-                : "";
-
-        if (CodexProviderManager.CODEX_CLI_LOGIN_PROVIDER_ID.equals(currentId)) {
-            return isCodexLocalConfigAuthorized()
-                    ? CODEX_RUNTIME_ACCESS_CLI_LOGIN
-                    : CODEX_RUNTIME_ACCESS_INACTIVE;
-        }
-
-        if (!currentId.isEmpty()
-                && codex.has("providers")
-                && codex.get("providers").isJsonObject()
-                && codex.getAsJsonObject("providers").has(currentId)) {
-            return CODEX_RUNTIME_ACCESS_MANAGED;
-        }
-
-        return CODEX_RUNTIME_ACCESS_INACTIVE;
-    }
-
-    public int saveCodexProviders(List<JsonObject> providers) throws IOException {
-        return codexProviderManager.saveProviders(providers);
-    }
-
-    public void saveCodexProviderOrder(List<String> orderedIds) throws IOException {
-        codexProviderManager.saveProviderOrder(orderedIds);
     }
 }

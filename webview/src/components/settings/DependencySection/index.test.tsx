@@ -8,9 +8,7 @@ const translations: Record<string, string> = {
   'settings.dependency.installPolicyTip': '安装遇到问题？可将报错复制给终端 CLI AI 解决',
   'settings.dependency.loading': '加载中',
   'settings.dependency.claudeSdkName': 'Claude Code SDK',
-  'settings.dependency.codexSdkName': 'Codex SDK',
   'settings.dependency.claudeSdkDescription': 'Claude AI 功能所需。包含 Claude Code SDK 及相关依赖。',
-  'settings.dependency.codexSdkDescription': 'Codex AI 功能所需。包含 OpenAI Codex SDK。',
   'settings.dependency.targetVersion': '目标版本',
   'settings.dependency.loadingVersions': '版本列表加载中',
   'settings.dependency.installedVersion': '当前版本 {{version}}',
@@ -62,12 +60,6 @@ describe('DependencySection', () => {
           installedVersion: '0.2.89',
           hasUpdate: false,
         },
-        'codex-sdk': {
-          id: 'codex-sdk',
-          name: 'Codex SDK',
-          status: 'not_installed',
-          hasUpdate: false,
-        },
       }));
 
       window.dependencyVersionsLoaded?.(JSON.stringify({
@@ -77,20 +69,13 @@ describe('DependencySection', () => {
           source: 'remote',
           latestVersion: '0.2.89',
         },
-        'codex-sdk': {
-          sdkId: 'codex-sdk',
-          versions: ['0.118.0', '0.117.0'],
-          source: 'remote',
-          latestVersion: '0.118.0',
-        },
       }));
     });
 
     expect(screen.queryByText('自定义版本')).toBeNull();
-    expect(screen.getAllByText('目标版本')).toHaveLength(2);
+    expect(screen.getAllByText('目标版本')).toHaveLength(1);
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getByRole('button', { name: '目标版本 v0.2.89' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '目标版本 v0.118.0' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '当前版本' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: '卸载' })).toHaveLength(1);
   });
@@ -108,12 +93,6 @@ describe('DependencySection', () => {
           hasUpdate: true,
           latestVersion: '0.2.90',
         },
-        'codex-sdk': {
-          id: 'codex-sdk',
-          name: 'Codex SDK',
-          status: 'not_installed',
-          hasUpdate: false,
-        },
       }));
 
       window.dependencyVersionsLoaded?.(JSON.stringify({
@@ -122,12 +101,6 @@ describe('DependencySection', () => {
           versions: ['0.2.90', '0.2.89', '0.2.88'],
           source: 'remote',
           latestVersion: '0.2.90',
-        },
-        'codex-sdk': {
-          sdkId: 'codex-sdk',
-          versions: ['0.118.0', '0.117.0'],
-          source: 'remote',
-          latestVersion: '0.118.0',
         },
       }));
     });
@@ -159,12 +132,6 @@ describe('DependencySection', () => {
           installedVersion: '0.2.89',
           hasUpdate: false,
         },
-        'codex-sdk': {
-          id: 'codex-sdk',
-          name: 'Codex SDK',
-          status: 'not_installed',
-          hasUpdate: false,
-        },
       }));
     });
 
@@ -178,12 +145,6 @@ describe('DependencySection', () => {
           versions: ['0.2.89', '0.2.88'],
           source: 'remote',
           latestVersion: '0.2.89',
-        },
-        'codex-sdk': {
-          sdkId: 'codex-sdk',
-          versions: ['0.118.0', '0.117.0'],
-          source: 'remote',
-          latestVersion: '0.118.0',
         },
       }));
     });

@@ -25,7 +25,6 @@
 
 import { createInterface } from 'readline';
 import { handleClaudeCommand } from './channels/claude-channel.js';
-import { handleCodexCommand } from './channels/codex-channel.js';
 import { loadClaudeSdk, isClaudeSdkAvailable } from './utils/sdk-loader.js';
 import {
   sendMessagePersistent,
@@ -338,9 +337,6 @@ async function processRequest(request) {
       switch (provider) {
         case 'claude':
           await handleClaudeCommand(command, [], stdinData);
-          break;
-        case 'codex':
-          await handleCodexCommand(command, [], stdinData);
           break;
         default:
           throw new Error(`Unknown provider: ${provider}`);

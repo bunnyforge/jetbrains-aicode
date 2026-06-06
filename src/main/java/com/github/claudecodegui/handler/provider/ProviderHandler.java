@@ -6,7 +6,6 @@ import com.github.claudecodegui.handler.core.HandlerContext;
 /**
  * Provider management message handler.
  * Handles provider CRUD operations and switching.
- * Supports both Claude and Codex providers.
  */
 public class ProviderHandler extends BaseMessageHandler {
 
@@ -24,30 +23,18 @@ public class ProviderHandler extends BaseMessageHandler {
             "preview_cc_switch_import",
             "open_file_chooser_for_cc_switch",
             "save_imported_providers",
-            "sort_providers",
-            // Codex provider operations
-            "get_codex_providers",
-            "get_current_codex_config",
-            "add_codex_provider",
-            "update_codex_provider",
-            "delete_codex_provider",
-            "switch_codex_provider",
-            "revoke_codex_local_config_authorization",
-            "get_active_codex_provider",
-            "sort_codex_providers"
+            "sort_providers"
     };
 
     private final ClaudeProviderOperations claudeOps;
-    private final CodexProviderOperations codexOps;
     private final ProviderImportExportSupport importExportSupport;
     private final ProviderOrderingService orderingService;
 
     public ProviderHandler(HandlerContext context) {
         super(context);
         this.claudeOps = new ClaudeProviderOperations(context);
-        this.codexOps = new CodexProviderOperations(context);
         this.importExportSupport = new ProviderImportExportSupport(context, claudeOps);
-        this.orderingService = new ProviderOrderingService(context, claudeOps, codexOps);
+        this.orderingService = new ProviderOrderingService(context, claudeOps);
     }
 
     @Override
@@ -97,34 +84,6 @@ public class ProviderHandler extends BaseMessageHandler {
                 return true;
             case "sort_providers":
                 orderingService.handleSortProviders(content);
-                return true;
-            // Codex provider operations
-            case "get_codex_providers":
-                codexOps.handleGetCodexProviders();
-                return true;
-            case "get_current_codex_config":
-                codexOps.handleGetCurrentCodexConfig();
-                return true;
-            case "add_codex_provider":
-                codexOps.handleAddCodexProvider(content);
-                return true;
-            case "update_codex_provider":
-                codexOps.handleUpdateCodexProvider(content);
-                return true;
-            case "delete_codex_provider":
-                codexOps.handleDeleteCodexProvider(content);
-                return true;
-            case "switch_codex_provider":
-                codexOps.handleSwitchCodexProvider(content);
-                return true;
-            case "revoke_codex_local_config_authorization":
-                codexOps.handleRevokeCodexLocalConfigAuthorization(content);
-                return true;
-            case "get_active_codex_provider":
-                codexOps.handleGetActiveCodexProvider();
-                return true;
-            case "sort_codex_providers":
-                orderingService.handleSortCodexProviders(content);
                 return true;
             default:
                 return false;

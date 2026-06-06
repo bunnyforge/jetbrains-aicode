@@ -76,6 +76,8 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
       onInput,
       onAddAttachment,
       onRemoveAttachment,
+      imageInputSupported = true,
+      onUnsupportedImageAttempt,
       onModeSelect,
       onModelSelect,
       onProviderSelect,
@@ -86,8 +88,6 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
       onClearContext,
       alwaysThinkingEnabled,
       onToggleThinking,
-      streamingEnabled,
-      onStreamingEnabledChange,
       sendShortcut = 'enter',
       selectedAgent,
       onAgentSelect,
@@ -106,8 +106,6 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
       onRemoveFromQueue,
       autoOpenFileEnabled,
       onAutoOpenFileEnabledChange,
-      longContextEnabled = true,
-      onLongContextChange,
     }: ChatInputBoxProps,
     ref: React.ForwardedRef<ChatInputBoxHandle>
   ) => {
@@ -527,6 +525,8 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
       flushInput: () => {
         debouncedOnInput.flush();
       },
+      imageInputSupported,
+      onUnsupportedImageAttempt,
     });
 
     /**
@@ -614,6 +614,8 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
           onDismissOpenSourceBanner={handleDismissOpenSourceBanner}
           autoOpenFileEnabled={autoOpenFileEnabled}
           onRequestEnableFileContext={handleRequestEnableFileContext}
+          imageInputSupported={imageInputSupported}
+          onUnsupportedAttachAttempt={onUnsupportedImageAttempt}
         />
 
         {/* Input area */}
@@ -709,15 +711,7 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
           onEnhancePrompt={handleEnhancePrompt}
           alwaysThinkingEnabled={alwaysThinkingEnabled}
           onToggleThinking={onToggleThinking}
-          streamingEnabled={streamingEnabled}
-          onStreamingEnabledChange={onStreamingEnabledChange}
-          selectedAgent={selectedAgent}
-          onAgentSelect={(agent) => onAgentSelect?.(agent)}
-          onOpenAgentSettings={onOpenAgentSettings}
           onAddModel={onOpenModelSettings}
-          onClearAgent={() => onAgentSelect?.(null)}
-          longContextEnabled={longContextEnabled}
-          onLongContextChange={onLongContextChange}
           fileCompletion={fileCompletion}
           commandCompletion={commandCompletion}
           agentCompletion={agentCompletion}

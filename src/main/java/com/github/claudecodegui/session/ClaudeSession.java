@@ -3,7 +3,7 @@ package com.github.claudecodegui.session;
 import com.github.claudecodegui.permission.PermissionManager;
 import com.github.claudecodegui.permission.PermissionRequest;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.opencode.OpencodeSDKBridge;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
@@ -40,7 +40,6 @@ public class ClaudeSession {
     // Context collector
     private final com.github.claudecodegui.session.EditorContextCollector contextCollector;
     private final SessionContextService contextService;
-    private final SessionProviderRouter providerRouter;
     private final SessionSendService sendService;
     private final SessionMessageOrchestrator messageOrchestrator;
 
@@ -49,7 +48,7 @@ public class ClaudeSession {
 
     // SDK bridges
     private final ClaudeSDKBridge claudeSDKBridge;
-    private final CodexSDKBridge codexSDKBridge;
+    private final OpencodeSDKBridge opencodeSDKBridge;
 
     // Permission manager
     private final PermissionManager permissionManager = new PermissionManager();
@@ -131,10 +130,10 @@ public class ClaudeSession {
         }
     }
 
-    public ClaudeSession(Project project, ClaudeSDKBridge claudeSDKBridge, CodexSDKBridge codexSDKBridge) {
+    public ClaudeSession(Project project, ClaudeSDKBridge claudeSDKBridge, OpencodeSDKBridge opencodeSDKBridge) {
         this.project = project;
         this.claudeSDKBridge = claudeSDKBridge;
-        this.codexSDKBridge = codexSDKBridge;
+        this.opencodeSDKBridge = opencodeSDKBridge;
 
         // Initialize managers
         this.state = new com.github.claudecodegui.session.SessionState();
@@ -143,7 +142,6 @@ public class ClaudeSession {
         this.contextCollector = new com.github.claudecodegui.session.EditorContextCollector(project);
         this.callbackFacade = new SessionCallbackFacade(project);
         this.contextService = new SessionContextService(project, MAX_FILE_SIZE_BYTES);
-        this.providerRouter = new SessionProviderRouter(claudeSDKBridge, codexSDKBridge);
         this.sendService = new SessionSendService(
                 project,
                 state,
@@ -152,7 +150,7 @@ public class ClaudeSession {
                 messageMerger,
                 gson,
                 claudeSDKBridge,
-                codexSDKBridge,
+                opencodeSDKBridge,
                 contextService
         );
         this.messageOrchestrator = new SessionMessageOrchestrator(
@@ -162,8 +160,8 @@ public class ClaudeSession {
                 callbackFacade,
                 new SessionMessageOrchestrator.SessionHistoryAccess() {
                     @Override
-                    public List<JsonObject> getProviderSessionMessages(String provider, String sessionId, String cwd) {
-                        return providerRouter.getSessionMessages(provider, sessionId, cwd);
+                    public List<JsonObject> getProviderSessionMessages(String sessionId, String cwd) {
+                        return claudeSDKBridge.getSessionMessages(sessionId, cwd);
                     }
 
                     @Override
@@ -279,12 +277,10 @@ public class ClaudeSession {
                             currentSessionId = null;
                         }
 
-                        // Select SDK based on provider
-                        String currentProvider = state.getProvider();
+                        // Launch Claude channel
                         String currentChannelId = state.getChannelId();
                         String currentCwd = state.getCwd();
-                        JsonObject result = providerRouter.launchChannel(
-                                currentProvider,
+                        JsonObject result = claudeSDKBridge.launchChannel(
                                 currentChannelId,
                                 currentSessionId,
                                 currentCwd
@@ -451,7 +447,7 @@ public class ClaudeSession {
 
         return CompletableFuture.runAsync(() -> {
             try {
-                providerRouter.interruptChannel(state.getProvider(), state.getChannelId());
+                claudeSDKBridge.interruptChannel(state.getChannelId());
                 state.setError(null);  // Clear previous error state
                 state.setBusy(false);
                 state.setLoading(false);  // Also reset loading state

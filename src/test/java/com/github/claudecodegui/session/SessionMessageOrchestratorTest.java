@@ -165,7 +165,7 @@ public class SessionMessageOrchestratorTest {
         SessionMessageOrchestrator.SessionHistoryAccess failingAccess =
                 new SessionMessageOrchestrator.SessionHistoryAccess() {
                     @Override
-                    public List<JsonObject> getProviderSessionMessages(String provider, String sessionId, String cwd) {
+                    public List<JsonObject> getProviderSessionMessages(String sessionId, String cwd) {
                         throw new RuntimeException("connection refused");
                     }
 
@@ -302,7 +302,7 @@ public class SessionMessageOrchestratorTest {
         private JsonObject latestClaudeUserMessage;
 
         @Override
-        public List<JsonObject> getProviderSessionMessages(String provider, String sessionId, String cwd) {
+        public List<JsonObject> getProviderSessionMessages(String sessionId, String cwd) {
             providerHistoryRequests.incrementAndGet();
             return providerHistory;
         }

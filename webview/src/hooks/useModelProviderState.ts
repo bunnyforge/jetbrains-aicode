@@ -1,18 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { sendBridgeEvent } from '../utils/bridge';
 import {
-  apply1MContextSuffix,
   normalizeClaudeModelId,
-  strip1MContextSuffix,
 } from '../components/ChatInputBox/types';
-import type { PermissionMode } from '../components/ChatInputBox/types';
+import type { PermissionMode, ReasoningEffort } from '../components/ChatInputBox/types';
 import { isSpecialProviderId } from '../types/provider';
 import { useClaudeProvider } from './providers/useClaudeProvider';
-import { useCodexProvider } from './providers/useCodexProvider';
 import { useUsageTracking } from './providers/useUsageTracking';
 import { useProviderSettings } from './providers/useProviderSettings';
 import { useModelStatePersistence } from './providers/useModelStatePersistence';
+import { useModelCapabilities } from './useModelCapabilities';
+import { resolveMappedModelName, readClaudeModelMapping } from '../utils/claudeModelMapping';
 
 export type ViewMode = 'chat' | 'history' | 'settings';
 
@@ -22,11 +21,10 @@ export interface UseModelProviderStateOptions {
 }
 
 /**
- * Orchestrates provider/model/permission state. Composes four single-purpose
- * sub-hooks (Claude / Codex / usage tracking / provider settings) plus a
- * persistence hook, then wires the cross-slice state (currentProvider +
- * permissionMode) and the cross-provider handlers (mode/model/provider switch,
- * long-context toggle, always-thinking toggle).
+ * Orchestrates provider/model/permission state for the single Claude provider.
+ * Composes Claude-specific state hooks, usage tracking, and provider settings,
+ * then wires the cross-slice handlers (mode/model/provider switch,
+ * always-thinking toggle, reasoning effort).
  *
  * The flat return shape is preserved as the public API: callers (App,
  * ChatScreen, AppDialogs, useMessageSender) destructure individual fields.
@@ -37,113 +35,156 @@ export interface UseModelProviderStateOptions {
  */
 export function useModelProviderState({ addToast, t }: UseModelProviderStateOptions) {
   // ── Cross-slice state owned by the orchestrator ──
-  const [currentProvider, setCurrentProvider] = useState('claude');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
 
   // External-facing ref so window callbacks can read the latest provider
   // without re-binding. Render-time assignment avoids the useRef + useEffect
   // mirror anti-pattern (rule 5.15).
-  const currentProviderRef = useRef(currentProvider);
-  currentProviderRef.current = currentProvider;
+  const currentProviderRef = useRef('claude');
+  currentProviderRef.current = 'claude';
 
   // ── Provider-specific sub-hooks ──
   const claude = useClaudeProvider();
-  const codex = useCodexProvider();
-  const { isSdkInstalled, ...usage } = useUsageTracking();
+  const {
+    isSdkInstalled,
+    usageUsedTokens,
+    setUsageMaxTokens,
+    setUsagePercentage,
+    ...usage
+  } = useUsageTracking();
   const settings = useProviderSettings({ addToast, t });
 
   const {
     selectedClaudeModel, setSelectedClaudeModel,
     claudePermissionMode, setClaudePermissionMode,
-    longContextEnabled, setLongContextEnabled,
     setClaudeSettingsAlwaysThinkingEnabled,
-  } = claude;
-  const {
-    selectedCodexModel, setSelectedCodexModel,
-    codexPermissionMode, setCodexPermissionMode,
     reasoningEffort, setReasoningEffort,
-  } = codex;
+  } = claude;
 
   // ── Persistence: load on mount + save on change ──
   useModelStatePersistence({
-    setCurrentProvider,
     setSelectedClaudeModel,
-    setSelectedCodexModel,
     setClaudePermissionMode,
-    setCodexPermissionMode,
     setPermissionMode,
-    setLongContextEnabled,
-    setReasoningEffort,
-    currentProvider,
     selectedClaudeModel,
-    selectedCodexModel,
     claudePermissionMode,
-    codexPermissionMode,
-    longContextEnabled,
-    reasoningEffort,
   });
 
   // ── Computed values ──
-  const selectedModel = currentProvider === 'codex' ? selectedCodexModel : selectedClaudeModel;
   const currentSdkInstalled = useMemo(
-    () => isSdkInstalled(currentProvider),
-    [isSdkInstalled, currentProvider],
+    () => isSdkInstalled('claude'),
+    [isSdkInstalled],
   );
+
+  // ── Active model id (resolves the Claude → third-party mapping) ──
+  // We look up OpenRouter capabilities against the *effective* model id
+  // (after mapping) so the context window and reasoning flags reflect the
+  // model actually used at runtime, not the canonical Claude alias.
+  const activeModelId = useMemo(() => {
+    try {
+      const mapping = readClaudeModelMapping();
+      const resolved = resolveMappedModelName(selectedClaudeModel, mapping) ?? selectedClaudeModel;
+      console.debug(`[useModelProviderState] activeModelId: selectedClaudeModel="${selectedClaudeModel}" resolved="${resolved}"`);
+      return resolved;
+    } catch (e) {
+      console.debug(`[useModelProviderState] activeModelId: mapping lookup failed, using selectedClaudeModel="${selectedClaudeModel}":`, e);
+      return selectedClaudeModel;
+    }
+  }, [selectedClaudeModel]);
+
+  const { capabilities: activeModelCapabilities } = useModelCapabilities(activeModelId);
+
+  // Default to `true` (Claude family + most third-party Anthropic-format
+  // proxies accept images). Only flip to `false` once we have a confident
+  // capabilities result that says the model does not accept images. The
+  // `null` state during initial lookup stays permissive so the user can
+  // still paste an image while the catalog is loading.
+  const imageInputSupported = useMemo(() => {
+    if (!activeModelCapabilities) return true;
+    return activeModelCapabilities.supportsImageInput;
+  }, [activeModelCapabilities]);
+
+  const buildSetModelPayload = useCallback((modelId: string) => {
+    const payload: { model: string; contextWindow?: number; resolvedModel?: string } = { model: modelId };
+    if (activeModelCapabilities && activeModelCapabilities.contextWindow > 0) {
+      payload.contextWindow = activeModelCapabilities.contextWindow;
+    }
+    if (activeModelId && activeModelId !== modelId) {
+      payload.resolvedModel = activeModelId;
+    }
+    console.debug(`[useModelProviderState] buildSetModelPayload: model=${modelId}`
+      + (payload.contextWindow ? ` contextWindow=${payload.contextWindow}` : '')
+      + (payload.resolvedModel ? ` resolvedModel=${payload.resolvedModel}` : ''));
+    return JSON.stringify(payload);
+  }, [activeModelCapabilities, activeModelId]);
+
+  // Re-sync `set_model` once OpenRouter capabilities resolve for the active
+  // model so the backend context window reflects the real model (important
+  // when a Claude alias is mapped to a third-party model with a different
+  // context length, e.g. claude-sonnet-4-6 → minimax/minimax-m2.5).
+  const enrichedModelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeModelCapabilities || activeModelCapabilities.contextWindow <= 0) {
+      console.debug('[useModelProviderState] enrichment: skipped (no capabilities)');
+      return;
+    }
+    if (enrichedModelRef.current === activeModelId) {
+      console.debug(`[useModelProviderState] enrichment: already enriched for activeModelId=${activeModelId}`);
+      return;
+    }
+    enrichedModelRef.current = activeModelId;
+    console.debug(`[useModelProviderState] enrichment: activeModelId=${activeModelId} contextWindow=${activeModelCapabilities.contextWindow} → re-sending set_model`);
+    sendBridgeEvent('set_model', buildSetModelPayload(selectedClaudeModel));
+  }, [activeModelCapabilities, activeModelId, selectedClaudeModel, buildSetModelPayload]);
+
+  // Locally sync the context-window indicator (top-left ContextBar) when the
+  // active model changes, so the displayed max reflects the new model
+  // immediately rather than waiting for the next backend `onUsageUpdate`
+  // (which only fires after a message round-trip).
+  //
+  // The max is taken from `activeModelCapabilities`, which is resolved
+  // against `activeModelId` — the *real* model id after applying the
+  // Claude → third-party mapping (e.g. claude-sonnet-4-6 → minimax/m2.5).
+  // We do NOT use the Claude alias's default 200K window when a mapping
+  // has been configured.
+  //
+  // The percentage is recomputed only if we already have a real used-token
+  // count from a prior `onUsageUpdate`; if `usageUsedTokens` is undefined
+  // (e.g. a fresh session), we leave the percentage at its current value
+  // rather than fabricating a number from stale data.
+  useEffect(() => {
+    if (!activeModelCapabilities || activeModelCapabilities.contextWindow <= 0) {
+      return;
+    }
+    const newMax = activeModelCapabilities.contextWindow;
+    setUsageMaxTokens(newMax);
+    if (typeof usageUsedTokens === 'number' && usageUsedTokens > 0) {
+      const recomputed = Math.max(0, Math.min(100, (usageUsedTokens / newMax) * 100));
+      setUsagePercentage(recomputed);
+    }
+  }, [activeModelId, activeModelCapabilities, setUsageMaxTokens, setUsagePercentage, usageUsedTokens]);
 
   // ── Cross-provider handlers ──
   const handleModeSelect = useCallback((mode: PermissionMode) => {
-    if (currentProvider === 'codex') {
-      const codexMode: PermissionMode = mode === 'plan' ? 'default' : mode;
-      setPermissionMode(codexMode);
-      setCodexPermissionMode(codexMode);
-      sendBridgeEvent('set_mode', codexMode);
-      return;
-    }
     setPermissionMode(mode);
     setClaudePermissionMode(mode);
     sendBridgeEvent('set_mode', mode);
-  }, [currentProvider, setCodexPermissionMode, setClaudePermissionMode]);
+  }, [setClaudePermissionMode]);
 
   const handleModelSelect = useCallback((modelId: string) => {
-    if (currentProvider === 'claude') {
-      const strippedModelId = strip1MContextSuffix(modelId);
-      const normalizedModelId = normalizeClaudeModelId(strippedModelId);
-      setSelectedClaudeModel(normalizedModelId);
-      sendBridgeEvent('set_model', apply1MContextSuffix(normalizedModelId, longContextEnabled));
-    } else if (currentProvider === 'codex') {
-      setSelectedCodexModel(modelId);
-      sendBridgeEvent('set_model', modelId);
-    }
-  }, [currentProvider, longContextEnabled, setSelectedClaudeModel, setSelectedCodexModel]);
+    const normalizedModelId = normalizeClaudeModelId(modelId);
+    setSelectedClaudeModel(normalizedModelId);
+    sendBridgeEvent('set_model', buildSetModelPayload(normalizedModelId));
+  }, [setSelectedClaudeModel, buildSetModelPayload]);
 
-  const handleProviderSelect = useCallback((providerId: string) => {
-    setCurrentProvider(providerId);
-    sendBridgeEvent('set_provider', providerId);
+  const handleProviderSelect = useCallback((_providerId: string) => {
+    // Only Claude is supported; this is a no-op kept for API compatibility.
+  }, []);
 
-    const modeToSet: PermissionMode = providerId === 'codex'
-      ? (codexPermissionMode === 'plan' ? 'default' : codexPermissionMode)
-      : claudePermissionMode;
-    setPermissionMode(modeToSet);
-    sendBridgeEvent('set_mode', modeToSet);
-
-    const newModel = providerId === 'codex'
-      ? selectedCodexModel
-      : apply1MContextSuffix(selectedClaudeModel, longContextEnabled);
-    sendBridgeEvent('set_model', newModel);
-  }, [
-    claudePermissionMode,
-    codexPermissionMode,
-    selectedCodexModel,
-    selectedClaudeModel,
-    longContextEnabled,
-  ]);
-
-  const handleLongContextChange = useCallback((enabled: boolean) => {
-    setLongContextEnabled(enabled);
-    if (currentProvider === 'claude') {
-      sendBridgeEvent('set_model', apply1MContextSuffix(selectedClaudeModel, enabled));
-    }
-  }, [currentProvider, selectedClaudeModel, setLongContextEnabled]);
+  const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
+    setReasoningEffort(effort);
+    sendBridgeEvent('set_reasoning_effort', effort);
+  }, [setReasoningEffort]);
 
   const handleToggleThinking = useCallback((enabled: boolean) => {
     const config = settings.activeProviderConfig;
@@ -186,18 +227,24 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
 
   return {
     ...claude,
-    ...codex,
     ...usage,
+    usageUsedTokens,
+    setUsageMaxTokens,
+    setUsagePercentage,
     ...settings,
-    currentProvider, setCurrentProvider,
+    currentProvider: 'claude',
+    selectedModel: selectedClaudeModel,
+    activeModelId,
+    reasoningEffort,
     permissionMode, setPermissionMode,
-    selectedModel,
     currentSdkInstalled,
     currentProviderRef,
+    activeModelCapabilities,
+    imageInputSupported,
     handleModeSelect,
     handleModelSelect,
     handleProviderSelect,
-    handleLongContextChange,
     handleToggleThinking,
+    handleReasoningChange,
   };
 }

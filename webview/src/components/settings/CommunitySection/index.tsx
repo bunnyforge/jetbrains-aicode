@@ -5,7 +5,8 @@ import { CHANGELOG_DATA } from '../../../version/changelog';
 import wxqImage from '../../../assets/images/wxq.png';
 import styles from './style.module.less';
 
-const GITHUB_URL = 'https://github.com/zhukunpenglinyutong/idea-claude-code-gui';
+const GITHUB_URL = 'https://github.com/bunnyforge/jetbrains-aicode';
+const WECHAT_ID = 'rabbitvps';
 
 interface CommunitySectionProps {
   addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -24,6 +25,15 @@ const CommunitySection = ({ addToast }: CommunitySectionProps) => {
     }
   }, [addToast, t]);
 
+  const handleCopyWeChat = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(WECHAT_ID);
+      addToast(t('settings.wechatCopied'), 'success');
+    } catch {
+      addToast(t('settings.wechatCopyFailed'), 'error');
+    }
+  }, [addToast, t]);
+
   return (
     <div className={styles.configSection}>
       {/* Official community group */}
@@ -38,6 +48,21 @@ const CommunitySection = ({ addToast }: CommunitySectionProps) => {
             className={styles.qrcodeImage}
           />
           <p className={styles.qrcodeTip}>{t('settings.communityQrTip')}</p>
+          <div className={styles.wechatIdBlock}>
+            <span className={`codicon ${'codicon-comment-discussion'} ${styles.wechatIdIcon}`} />
+            <div className={styles.wechatIdText}>
+              <span className={styles.wechatIdValue}>{WECHAT_ID}</span>
+            </div>
+            <button
+              type="button"
+              className={styles.wechatIdCopyBtn}
+              onClick={handleCopyWeChat}
+              title={t('settings.wechatCopyBtn')}
+            >
+              <span className="codicon codicon-copy" />
+              {t('settings.wechatCopyBtn')}
+            </button>
+          </div>
         </div>
       </div>
 

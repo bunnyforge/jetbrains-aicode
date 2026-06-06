@@ -4,6 +4,7 @@ import com.github.claudecodegui.handler.core.BaseMessageHandler;
 import com.github.claudecodegui.handler.core.HandlerContext;
 import com.github.claudecodegui.handler.provider.ModelProviderHandler;
 
+import com.github.claudecodegui.handler.provider.OpenRouterCatalogService;
 import com.github.claudecodegui.util.LanguageConfigService;
 import com.github.claudecodegui.util.ThemeConfigService;
 import com.google.gson.Gson;
@@ -51,8 +52,6 @@ public class SettingsHandler extends BaseMessageHandler {
         "browse_code_font_file",
         "get_streaming_enabled",
         "set_streaming_enabled",
-        "get_codex_sandbox_mode",
-        "set_codex_sandbox_mode",
         "get_send_shortcut",
         "set_send_shortcut",
         "get_auto_open_file_enabled",
@@ -89,7 +88,10 @@ public class SettingsHandler extends BaseMessageHandler {
         // User language preference
         "set_user_language",
         "get_user_language",
-        "clear_user_language"
+        "clear_user_language",
+        // OpenRouter model catalog (used by webview to look up context windows
+        // and capabilities for arbitrary model ids the user types into the UI)
+        "get_openrouter_catalog"
     };
 
     public SettingsHandler(HandlerContext context) {
@@ -192,12 +194,6 @@ public class SettingsHandler extends BaseMessageHandler {
                 return true;
             case "set_streaming_enabled":
                 projectConfigHandler.handleSetStreamingEnabled(content);
-                return true;
-            case "get_codex_sandbox_mode":
-                projectConfigHandler.handleGetCodexSandboxMode();
-                return true;
-            case "set_codex_sandbox_mode":
-                projectConfigHandler.handleSetCodexSandboxMode(content);
                 return true;
             case "get_send_shortcut":
                 projectConfigHandler.handleGetSendShortcut();
@@ -313,6 +309,9 @@ public class SettingsHandler extends BaseMessageHandler {
             case "clear_user_language":
                 handleClearUserLanguage();
                 return true;
+            case "get_openrouter_catalog":
+                handleGetOpenRouterCatalog();
+                return true;
             default:
                 return false;
         }
@@ -372,6 +371,48 @@ public class SettingsHandler extends BaseMessageHandler {
     private void pushLanguageConfig() {
         JsonObject languageConfig = LanguageConfigService.getLanguageConfig(context.getSettingsService());
         callJavaScript("window.applyIdeaLanguageConfig", escapeJs(languageConfig.toString()));
+    }
+
+    /**
+     * Handle a webview request for the OpenRouter model catalog.
+     *
+     * <p>JCEF cannot reach external HTTPS endpoints from the renderer, so the
+     * webview asks the Java side. The catalog is fetched on demand via the JDK
+     * HttpClient (in {@link OpenRouterCatalogService}), cached in-memory for
+     * 24h, and pushed back as a JSON object on {@code window.onOpenRouterCatalog}.
+     * On any upstream failure the response is an empty {@code models} array
+     * — the webview then falls back to its own localStorage cache or to a
+     * direct fetch.
+     */
+    private void handleGetOpenRouterCatalog() {
+        LOG.info("[SettingsHandler] get_openrouter_catalog: received request from webview");
+        OpenRouterCatalogService.getInstance().getCatalog()
+                .handle((models, error) -> {
+                    JsonObject payload = new JsonObject();
+                    if (models != null) {
+                        payload.add("models", models);
+                        LOG.info("[SettingsHandler] get_openrouter_catalog: returning " + models.size() + " models");
+                    } else {
+                        payload.add("models", new com.google.gson.JsonArray());
+                        Throwable cause = error instanceof java.util.concurrent.CompletionException
+                                && error.getCause() != null
+                                ? error.getCause() : error;
+                        LOG.warn("[SettingsHandler] get_openrouter_catalog: fetch failed: "
+                                + (cause.getMessage() != null ? cause.getMessage() : "unknown"));
+                    }
+                    payload.addProperty("ok", error == null);
+                    if (error != null) {
+                        Throwable cause = error instanceof java.util.concurrent.CompletionException
+                                && error.getCause() != null
+                                ? error.getCause() : error;
+                        payload.addProperty("error",
+                                cause.getMessage() != null ? cause.getMessage() : "unknown");
+                    }
+                    String json = payload.toString();
+                    LOG.info("[SettingsHandler] get_openrouter_catalog: pushing window.onOpenRouterCatalog (json length=" + json.length() + ")");
+                    callJavaScript("window.onOpenRouterCatalog", escapeJs(json));
+                    return null;
+                });
     }
 
     /**

@@ -12,6 +12,41 @@ export interface ClaudeModelMapping {
 }
 
 /**
+ * Single source of truth mapping a Claude model id to the key used inside
+ * `ClaudeModelMapping`. Legacy `claude-opus-4-6` and its 1M-context variant
+ * both point at the `opus` bucket so the user only has to configure one
+ * placeholder per model family.
+ */
+export const MODEL_ID_TO_MAPPING_KEY: Record<string, keyof ClaudeModelMapping> = {
+  'claude-sonnet-4-6': 'sonnet',
+  'claude-opus-4-8': 'opus',
+  'claude-opus-4-7': 'opus',
+  'claude-opus-4-6': 'opus',
+  'claude-opus-4-6[1m]': 'opus',
+  'claude-haiku-4-5': 'haiku',
+};
+
+/**
+ * Resolve the display name for a Claude model id against the active mapping.
+ * Returns `undefined` when the id is not a known Claude model or no mapping
+ * value is set for it.
+ */
+export function resolveMappedModelName(
+  modelId: string,
+  mapping: ClaudeModelMapping
+): string | undefined {
+  const key = MODEL_ID_TO_MAPPING_KEY[modelId];
+  if (key) {
+    const direct = mapping[key];
+    if (direct && direct.trim().length > 0) {
+      return direct.trim();
+    }
+  }
+  const main = mapping.main;
+  return main && main.trim().length > 0 ? main.trim() : undefined;
+}
+
+/**
  * Read the Claude model mapping.
  */
 export function readClaudeModelMapping(): ClaudeModelMapping {

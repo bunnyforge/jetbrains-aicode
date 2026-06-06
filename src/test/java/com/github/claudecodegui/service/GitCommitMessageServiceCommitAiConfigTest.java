@@ -16,7 +16,7 @@ public class GitCommitMessageServiceCommitAiConfigTest {
 
     @Test
     public void shouldReturnUnavailableErrorWhenNoCommitAiProviderIsResolved() {
-        TestableGitCommitMessageService service = new TestableGitCommitMessageService(buildConfig(null, "claude-sonnet-4-6", "gpt-5.5"));
+        TestableGitCommitMessageService service = new TestableGitCommitMessageService(buildConfig(null, "claude-sonnet-4-6"));
         ResultCapture callback = new ResultCapture();
 
         service.generateCommitMessage(Collections.<Change>emptyList(), callback);
@@ -24,34 +24,20 @@ public class GitCommitMessageServiceCommitAiConfigTest {
         assertNull(callback.success);
         assertNotNull(callback.error);
         assertNull(service.lastClaudeModel);
-        assertNull(service.lastCodexModel);
     }
 
     @Test
     public void shouldRouteToResolvedClaudeModel() {
-        TestableGitCommitMessageService service = new TestableGitCommitMessageService(buildConfig("claude", "claude-opus-4-7", "gpt-5.5"));
+        TestableGitCommitMessageService service = new TestableGitCommitMessageService(buildConfig("claude", "claude-opus-4-7"));
         ResultCapture callback = new ResultCapture();
 
         service.generateCommitMessage(Collections.<Change>emptyList(), callback);
 
         assertEquals("claude-opus-4-7", service.lastClaudeModel);
-        assertNull(service.lastCodexModel);
         assertEquals("fix: use claude routing", callback.success);
     }
 
-    @Test
-    public void shouldRouteToResolvedCodexModel() {
-        TestableGitCommitMessageService service = new TestableGitCommitMessageService(buildConfig("codex", "claude-sonnet-4-6", "gpt-5.4"));
-        ResultCapture callback = new ResultCapture();
-
-        service.generateCommitMessage(Collections.<Change>emptyList(), callback);
-
-        assertEquals("gpt-5.4", service.lastCodexModel);
-        assertNull(service.lastClaudeModel);
-        assertEquals("fix: use codex routing", callback.success);
-    }
-
-    private JsonObject buildConfig(String effectiveProvider, String claudeModel, String codexModel) {
+    private JsonObject buildConfig(String effectiveProvider, String claudeModel) {
         JsonObject config = new JsonObject();
         config.add("provider", JsonNull.INSTANCE);
         if (effectiveProvider == null) {
@@ -63,12 +49,10 @@ public class GitCommitMessageServiceCommitAiConfigTest {
 
         JsonObject models = new JsonObject();
         models.addProperty("claude", claudeModel);
-        models.addProperty("codex", codexModel);
         config.add("models", models);
 
         JsonObject availability = new JsonObject();
         availability.addProperty("claude", true);
-        availability.addProperty("codex", true);
         config.add("availability", availability);
         return config;
     }
@@ -91,7 +75,6 @@ public class GitCommitMessageServiceCommitAiConfigTest {
     private static class TestableGitCommitMessageService extends GitCommitMessageService {
         private final JsonObject config;
         private String lastClaudeModel;
-        private String lastCodexModel;
 
         private TestableGitCommitMessageService(JsonObject config) {
             super((Project) null);
@@ -112,12 +95,6 @@ public class GitCommitMessageServiceCommitAiConfigTest {
         protected void callClaudeAPI(String prompt, String model, CommitMessageCallback callback) {
             this.lastClaudeModel = model;
             callback.onSuccess("fix: use claude routing");
-        }
-
-        @Override
-        protected void callCodexAPI(String prompt, String model, CommitMessageCallback callback) {
-            this.lastCodexModel = model;
-            callback.onSuccess("fix: use codex routing");
         }
     }
 }

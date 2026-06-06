@@ -2,7 +2,6 @@ package com.github.claudecodegui.handler.core;
 
 import com.github.claudecodegui.session.ClaudeSession;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
@@ -19,7 +18,6 @@ public class HandlerContext {
 
     private final Project project;
     private final ClaudeSDKBridge claudeSDKBridge;
-    private final CodexSDKBridge codexSDKBridge;
     private final CodemossSettingsService settingsService;
     private final JsCallback jsCallback;
 
@@ -27,7 +25,6 @@ public class HandlerContext {
     private volatile ClaudeSession session;
     private volatile JBCefBrowser browser;
     private volatile String currentModel = DEFAULT_MODEL;
-    private volatile String currentProvider = DEFAULT_PROVIDER;
     private volatile boolean disposed = false;
 
     /**
@@ -41,13 +38,11 @@ public class HandlerContext {
     public HandlerContext(
             Project project,
             ClaudeSDKBridge claudeSDKBridge,
-            CodexSDKBridge codexSDKBridge,
             CodemossSettingsService settingsService,
             JsCallback jsCallback
     ) {
         this.project = project;
         this.claudeSDKBridge = claudeSDKBridge;
-        this.codexSDKBridge = codexSDKBridge;
         this.settingsService = settingsService;
         this.jsCallback = jsCallback;
     }
@@ -59,10 +54,6 @@ public class HandlerContext {
 
     public ClaudeSDKBridge getClaudeSDKBridge() {
         return claudeSDKBridge;
-    }
-
-    public CodexSDKBridge getCodexSDKBridge() {
-        return codexSDKBridge;
     }
 
     public CodemossSettingsService getSettingsService() {
@@ -82,7 +73,7 @@ public class HandlerContext {
     }
 
     public String getCurrentProvider() {
-        return currentProvider;
+        return DEFAULT_PROVIDER;
     }
 
     public boolean isDisposed() {
@@ -102,8 +93,8 @@ public class HandlerContext {
         this.currentModel = currentModel;
     }
 
-    public void setCurrentProvider(String currentProvider) {
-        this.currentProvider = currentProvider;
+    public void setCurrentProvider(@SuppressWarnings("unused") String provider) {
+        // No-op: only Claude is supported.
     }
 
     public void setDisposed(boolean disposed) {

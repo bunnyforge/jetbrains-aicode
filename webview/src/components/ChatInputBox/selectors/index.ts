@@ -4,4 +4,3 @@ export { ProviderSelect } from './ProviderSelect';
 export { RuntimeProviderSelect } from './RuntimeProviderSelect';
 export { ConfigSelect } from './ConfigSelect';
 export { ReasoningSelect } from './ReasoningSelect';
-export { LongContextToggle } from './LongContextToggle';

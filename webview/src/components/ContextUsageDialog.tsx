@@ -346,13 +346,17 @@ const ContextUsageDialog = memo(function ContextUsageDialog({
                     );
                   }
                   const filled = sq.squareFullness >= 0.7;
+                  // Defensive clamp: squareFullness is expected in [0, 1]
+                  // from the backend, but a stray negative or >1 value would
+                  // produce an out-of-range opacity.
+                  const clampedFullness = Math.max(0, Math.min(1, sq.squareFullness));
                   return (
                     <div
                       key={squareKey}
                       className={`context-usage-grid-cell ${filled ? 'filled' : 'partial'}`}
                       style={{
                         backgroundColor: resolveColor(sq.color),
-                        ...(filled ? {} : { opacity: 0.5 + sq.squareFullness * 0.5 }),
+                        ...(filled ? {} : { opacity: 0.5 + clampedFullness * 0.5 }),
                       }}
                       title={`${translateCategoryName(sq.categoryName)}: ${formatTokens(sq.tokens)} (${sq.percentage.toFixed(1)}%)`}
                     />

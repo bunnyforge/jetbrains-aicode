@@ -500,7 +500,7 @@
             "proxyConfigCodeLabel": "~/.claude/settings.json",
             "proxyConfigCode": "{\n  \"env\": {\n    \"HTTP_PROXY\": \"http://127.0.0.1:7897\",\n    \"HTTPS_PROXY\": \"http://127.0.0.1:7897\"\n  }\n}",
             "issuePrefix": "Si todavía no funciona, reporta un problema en GitHub: ",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           },
           "codex": {
             "title": "Configuración de cuenta de suscripción Codex",
@@ -514,7 +514,7 @@
             "proxyConfigCodeLabel": "",
             "proxyConfigCode": "",
             "issuePrefix": "Si todavía no funciona, reporta un problema en GitHub: ",
-            "issueUrl": "https://github.com/zhukunpenglinyutong/idea-claude-code-gui/issues"
+            "issueUrl": "https://github.com/bunnyforge/jetbrains-aicode/issues"
           }
         }
       },
@@ -583,7 +583,8 @@
         "xiaomi": "Xiaomi MiMo",
         "xiaomiPlan": "Xiaomi MiMo Plan",
         "qwen": "Alibaba Qwen",
-        "openrouter": "OpenRouter"
+        "openrouter": "OpenRouter",
+        "opencode": "OpenCode"
       }
     },
     "comingSoon": "Próximamente...",
@@ -709,7 +710,11 @@
         "confirmAdd": "Create",
         "saveChanges": "Save"
       }
-    }
+    },
+    "wechatIdLabel": "ID de WeChat",
+    "wechatCopyBtn": "Copiar",
+    "wechatCopied": "ID de WeChat copiado al portapapeles",
+    "wechatCopyFailed": "Error al copiar, por favor copie manualmente"
   },
   "history": {
     "title": "Historial de sesiones",

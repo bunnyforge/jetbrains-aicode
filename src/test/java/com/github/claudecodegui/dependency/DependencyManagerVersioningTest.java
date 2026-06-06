@@ -21,16 +21,6 @@ public class DependencyManagerVersioningTest {
     }
 
     @Test
-    public void shouldFallbackToSdkDefaultVersionWhenRequestedVersionIsBlank() {
-        List<String> packages = DependencyManager.buildPackageSpecs(
-                SdkDefinition.CODEX_SDK,
-                " "
-        );
-
-        assertEquals("@openai/codex-sdk@latest", packages.get(0));
-    }
-
-    @Test
     public void shouldNormalizeLeadingVInRequestedVersion() {
         assertEquals("0.2.81", DependencyManager.normalizeRequestedVersion(" v0.2.81 "));
     }

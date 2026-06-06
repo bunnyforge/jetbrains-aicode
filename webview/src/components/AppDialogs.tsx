@@ -24,15 +24,11 @@ import { setSkipNewSessionConfirm } from '../utils/skipNewSessionConfirm';
 const AddModelDialogWrapper = ({
   isOpen,
   onClose,
-  currentProvider,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  currentProvider: string;
 }) => {
-  const storageKey = currentProvider === 'codex'
-    ? STORAGE_KEYS.CODEX_CUSTOM_MODELS
-    : STORAGE_KEYS.CLAUDE_CUSTOM_MODELS;
+  const storageKey = STORAGE_KEYS.CLAUDE_CUSTOM_MODELS;
   const { models, updateModels } = usePluginModels(storageKey);
   return (
     <CustomModelDialog
@@ -59,8 +55,6 @@ export interface AppDialogsProps {
   onRewindSelectCancel: ComponentProps<typeof RewindSelectDialog>['onCancel'];
   onRewindConfirm: ComponentProps<typeof RewindDialog>['onConfirm'];
   onRewindCancel: ComponentProps<typeof RewindDialog>['onCancel'];
-  /** Provider id for the add-model dialog (lives in useModelProviderState). */
-  currentProvider: string;
   /** Permission dialog timeout in seconds (from backend config). */
   permissionDialogTimeoutSeconds?: number;
 }
@@ -83,7 +77,6 @@ export const AppDialogs = ({
   onRewindSelectCancel,
   onRewindConfirm,
   onRewindCancel,
-  currentProvider,
   permissionDialogTimeoutSeconds = DEFAULT_PERMISSION_DIALOG_TIMEOUT_SECONDS,
 }: AppDialogsProps) => {
   const { t } = useTranslation();
@@ -196,7 +189,6 @@ export const AppDialogs = ({
       <AddModelDialogWrapper
         isOpen={addModelDialogOpen}
         onClose={() => setAddModelDialogOpen(false)}
-        currentProvider={currentProvider}
       />
       {contextUsageDialogOpen ? (
         <ContextUsageDialog

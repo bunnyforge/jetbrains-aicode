@@ -350,6 +350,14 @@ interface Window {
   onFilePathResolved?: (json: string) => void;
 
   /**
+   * OpenRouter model catalog callback. The Java backend replies here when
+   * the webview sends `get_openrouter_catalog` (JCEF cannot reach external
+   * HTTPS endpoints directly, so the fetch is proxied through the IDE).
+   * The argument is a JSON string: `{ models: OpenRouterModel[], ok: boolean, error?: string }`.
+   */
+  onOpenRouterCatalog?: (json: string) => void;
+
+  /**
    * Show success message
    */
   showSuccess?: (message: string) => void;

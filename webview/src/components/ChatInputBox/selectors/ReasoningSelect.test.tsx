@@ -8,10 +8,16 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+const baseProps = {
+  enabled: true,
+  onEnabledChange: vi.fn(),
+};
+
 describe('ReasoningSelect', () => {
   it('shows xhigh and max for Claude Opus 4.7', () => {
     render(
       <ReasoningSelect
+        {...baseProps}
         value="high"
         onChange={vi.fn()}
         currentProvider="claude"
@@ -28,6 +34,7 @@ describe('ReasoningSelect', () => {
   it('shows max but not xhigh for Claude Sonnet 4.6', () => {
     render(
       <ReasoningSelect
+        {...baseProps}
         value="high"
         onChange={vi.fn()}
         currentProvider="claude"
@@ -46,6 +53,7 @@ describe('ReasoningSelect', () => {
 
     render(
       <ReasoningSelect
+        {...baseProps}
         value="xhigh"
         onChange={onChange}
         currentProvider="claude"
@@ -59,6 +67,7 @@ describe('ReasoningSelect', () => {
   it('hides for Claude models without effort support', () => {
     render(
       <ReasoningSelect
+        {...baseProps}
         value="high"
         onChange={vi.fn()}
         currentProvider="claude"

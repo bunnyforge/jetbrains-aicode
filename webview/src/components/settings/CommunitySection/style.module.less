@@ -45,6 +45,68 @@
   padding: 8px;
 }
 
+.wechatIdBlock {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-secondary);
+  border-radius: 8px;
+  min-width: 320px;
+}
+
+.wechatIdIcon {
+  font-size: 28px;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.wechatIdText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wechatIdLabel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.wechatIdValue {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+}
+
+.wechatIdCopyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+  }
+
+  .codicon {
+    font-size: 13px;
+  }
+}
+
 .qrcodeTip {
   margin: 0;
   font-size: 14px;

@@ -28,7 +28,6 @@ describe('useMessageSender - /context command', () => {
     setCurrentView: vi.fn(),
     forceCreateNewSession: vi.fn(),
     handleModeSelect: vi.fn(),
-    longContextEnabled: false,
     openContextUsageDialog: vi.fn(),
     closeContextUsageDialog: vi.fn().mockReturnValue(true),
     ...overrides,
@@ -38,10 +37,9 @@ describe('useMessageSender - /context command', () => {
     window.sendToJava = vi.fn();
   });
 
-  it('sends get_context_usage with base model when longContext is disabled', () => {
+  it('sends get_context_usage with current model id', () => {
     const opts = createOptions({
       selectedModel: 'claude-opus-4-7',
-      longContextEnabled: false,
     });
 
     const { result } = renderHook(() => useMessageSender(opts));
@@ -57,24 +55,6 @@ describe('useMessageSender - /context command', () => {
     const payload = JSON.parse(call.substring('get_context_usage:'.length));
     expect(payload.model).toBe('claude-opus-4-7');
     expect(payload.requestId).toBeTruthy();
-  });
-
-  it('sends get_context_usage with [1m] suffix when longContext is enabled', () => {
-    const opts = createOptions({
-      selectedModel: 'claude-opus-4-7',
-      longContextEnabled: true,
-    });
-
-    const { result } = renderHook(() => useMessageSender(opts));
-
-    act(() => {
-      result.current.handleSubmit('/context');
-    });
-
-    expect(window.sendToJava).toHaveBeenCalledTimes(1);
-    const call = (window.sendToJava as any).mock.calls[0][0] as string;
-    const payload = JSON.parse(call.substring('get_context_usage:'.length));
-    expect(payload.model).toBe('claude-opus-4-7[1m]');
   });
 
   it('opens dialog with loading state before sending bridge event', () => {

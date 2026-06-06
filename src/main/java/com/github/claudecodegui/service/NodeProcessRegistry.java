@@ -1,7 +1,6 @@
 package com.github.claudecodegui.service;
 
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
-import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.github.claudecodegui.provider.common.DaemonBridge;
 import com.github.claudecodegui.ui.toolwindow.ClaudeChatWindow;
 import com.github.claudecodegui.ui.toolwindow.ClaudeSDKToolWindow;
@@ -98,8 +97,8 @@ public final class NodeProcessRegistry implements Disposable {
             String sessionId = safeGetSessionId(window);
             // Use the tab's *current* provider (what the user sees) rather than the
             // physical SDK type. A Claude daemon may still be alive after the user
-            // switched the tab to Codex — labelling it "claude" then would confuse
-            // the user. The physical SDK type is preserved in the command tooltip.
+            // switched tabs — labelling it correctly avoids confusing the user.
+            // The physical SDK type is preserved in the command tooltip.
             String tabProvider = safeGetCurrentProvider(window);
 
             // -- DAEMON entries from ClaudeSDKBridge --
@@ -140,36 +139,6 @@ public final class NodeProcessRegistry implements Disposable {
                 // -- CHANNEL entries from claudeBridge.processManager --
                 Map<String, Process> claudeChannels = claudeBridge.getProcessManager().getActiveChannelSnapshot();
                 for (Map.Entry<String, Process> entry : claudeChannels.entrySet()) {
-                    Process p = entry.getValue();
-                    if (p == null || !p.isAlive()) {
-                        continue;
-                    }
-                    long pid = p.pid();
-                    knownPids.add(pid);
-                    ProcessHandle.Info info = safeInfo(p);
-                    long startedAt = info != null
-                            ? info.startInstant().map(Instant::toEpochMilli).orElse(-1L)
-                            : -1L;
-                    result.add(NodeProcessInfo.builder()
-                            .kind(NodeProcessInfo.Kind.CHANNEL)
-                            .provider(tabProvider)
-                            .pid(pid)
-                            .alive(true)
-                            .startedAtMs(startedAt)
-                            .uptimeMs(startedAt > 0 ? Math.max(0, now - startedAt) : 0L)
-                            .command(extractCommand(info))
-                            .channelId(entry.getKey())
-                            .sessionId(sessionId)
-                            .tabName(tabName)
-                            .build());
-                }
-            }
-
-            // -- CHANNEL entries from codexBridge.processManager (per-message processes) --
-            CodexSDKBridge codexBridge = safeCodexBridge(window);
-            if (codexBridge != null) {
-                Map<String, Process> codexChannels = codexBridge.getProcessManager().getActiveChannelSnapshot();
-                for (Map.Entry<String, Process> entry : codexChannels.entrySet()) {
                     Process p = entry.getValue();
                     if (p == null || !p.isAlive()) {
                         continue;
@@ -413,15 +382,11 @@ public final class NodeProcessRegistry implements Disposable {
         if (lower.contains("daemon.js")) {
             return "claude";
         }
-        if (lower.contains("codex")) {
-            return "codex";
-        }
         if (lower.contains("claude")) {
             return "claude";
         }
         return null;
     }
-
     private static @Nullable ProcessHandle.Info safeInfo(Process p) {
         try {
             return p.toHandle().info();
@@ -445,14 +410,6 @@ public final class NodeProcessRegistry implements Disposable {
     private static @Nullable ClaudeSDKBridge safeClaudeBridge(ClaudeChatWindow window) {
         try {
             return window != null ? window.getClaudeSDKBridge() : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static @Nullable CodexSDKBridge safeCodexBridge(ClaudeChatWindow window) {
-        try {
-            return window != null ? window.getCodexSDKBridge() : null;
         } catch (Exception e) {
             return null;
         }

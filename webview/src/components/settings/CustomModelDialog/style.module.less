@@ -11,8 +11,9 @@
 
 .modelItem {
   display: flex;
-  align-items: center;
-  padding: 8px 12px;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 4px;
   background: var(--bg-secondary);
   margin-bottom: 4px;
@@ -21,29 +22,38 @@
 .modelItemContent {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .modelItemId {
   font-size: 13px;
   font-weight: 500;
+  font-family: var(--vscode-editor-font-family, monospace);
+  word-break: break-all;
 }
 
 .modelItemLabel {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
-  margin-left: 4px;
+  margin-top: -2px;
+  opacity: 0.85;
 }
 
-.modelItemDesc {
-  font-size: 11px;
-  color: var(--text-tertiary);
+.modelItemTags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
   margin-top: 2px;
 }
 
 .modelItemActions {
   display: flex;
-  gap: 4px;
-  margin-left: 8px;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .iconBtn {
@@ -91,3 +101,9 @@
 .dialogFooterSpacer {
   flex: 1;
 }
+
+.suggestionWrapper {
+  position: relative;
+  flex: 1;
+}
+

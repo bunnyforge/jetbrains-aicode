@@ -23,6 +23,18 @@ interface UsePasteAndDropOptions {
   handleInput: (isComposingFromEvent?: boolean) => void;
   /** Immediately flush pending debounced onInput to sync parent state */
   flushInput: () => void;
+  /**
+   * Whether the active model accepts image input. When `false`, image
+   * paste/drop events are silently dropped (file-path paste/drop is still
+   * accepted). Defaults to `true` for backward compatibility.
+   */
+  imageInputSupported?: boolean;
+  /**
+   * Optional callback fired when an image paste/drop is dropped because
+   * the active model doesn't support image input. The parent can use this
+   * to surface a toast.
+   */
+  onUnsupportedImageAttempt?: () => void;
 }
 
 interface UsePasteAndDropReturn {
@@ -55,6 +67,8 @@ export function usePasteAndDrop({
   closeAllCompletions,
   handleInput,
   flushInput,
+  imageInputSupported = true,
+  onUnsupportedImageAttempt,
 }: UsePasteAndDropOptions): UsePasteAndDropReturn {
   /**
    * Handle paste event - detect images and plain text
@@ -76,6 +90,14 @@ export function usePasteAndDrop({
         if (item.type.startsWith('image/')) {
           hasImage = true;
           e.preventDefault();
+
+          // If the active model doesn't accept image input, drop the paste
+          // silently and notify the parent (toast). File paths / text below
+          // are still allowed so the user can keep typing.
+          if (!imageInputSupported) {
+            onUnsupportedImageAttempt?.();
+            return;
+          }
 
           const blob = item.getAsFile();
 
@@ -183,7 +205,7 @@ export function usePasteAndDrop({
         }
       }
     },
-    [setInternalAttachments, handleInput, flushInput]
+    [setInternalAttachments, handleInput, flushInput, imageInputSupported, onUnsupportedImageAttempt]
   );
 
   /**
@@ -218,6 +240,12 @@ export function usePasteAndDrop({
 
           // Only process image files
           if (file.type.startsWith('image/')) {
+            // Drop the image file if the active model doesn't support it;
+            // fall through to text/path handling below.
+            if (!imageInputSupported) {
+              onUnsupportedImageAttempt?.();
+              return;
+            }
             hasImageFile = true;
             const reader = new FileReader();
             reader.onload = () => {
@@ -323,12 +351,18 @@ export function usePasteAndDrop({
       setInternalAttachments,
       onInput,
       closeAllCompletions,
+      imageInputSupported,
+      onUnsupportedImageAttempt,
     ]
   );
 
   // Listen for image paste events dispatched from Java side (when clipboard has image but no text)
   useEffect(() => {
     const onJavaPasteImage = (e: Event) => {
+      if (!imageInputSupported) {
+        onUnsupportedImageAttempt?.();
+        return;
+      }
       const { base64, mediaType } = (e as CustomEvent).detail;
       if (!base64) return;
       const ext = mediaType?.split('/')[1] || 'png';
@@ -342,7 +376,7 @@ export function usePasteAndDrop({
     };
     window.addEventListener('java-paste-image', onJavaPasteImage);
     return () => window.removeEventListener('java-paste-image', onJavaPasteImage);
-  }, [setInternalAttachments]);
+  }, [setInternalAttachments, imageInputSupported, onUnsupportedImageAttempt]);
 
   return {
     handlePaste,

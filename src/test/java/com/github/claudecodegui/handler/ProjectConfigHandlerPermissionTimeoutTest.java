@@ -44,7 +44,6 @@ public class ProjectConfigHandlerPermissionTimeoutTest {
         return new HandlerContext(
                 null,
                 null,
-                null,
                 settingsService,
                 new HandlerContext.JsCallback() {
                     @Override

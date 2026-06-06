@@ -144,11 +144,12 @@ const App = () => {
     currentProviderRef,
     activeProviderConfig, claudeSettingsAlwaysThinkingEnabled,
     reasoningEffort, streamingEnabledSetting, sendShortcut, autoOpenFileEnabled,
-    longContextEnabled,
     usagePercentage, usageUsedTokens, usageMaxTokens,
+    activeModelId,
+    imageInputSupported,
     setPermissionMode,
-    setClaudePermissionMode, setCodexPermissionMode,
-    setSelectedClaudeModel, setSelectedCodexModel,
+    setClaudePermissionMode,
+    setSelectedClaudeModel,
     setProviderConfigVersion, setActiveProviderConfig,
     setClaudeSettingsAlwaysThinkingEnabled, setStreamingEnabledSetting,
     setSendShortcut, setAutoOpenFileEnabled,
@@ -156,9 +157,10 @@ const App = () => {
     setUsagePercentage, setUsageUsedTokens, setUsageMaxTokens,
     syncActiveProviderModelMapping,
     handleModeSelect, handleModelSelect, handleProviderSelect,
-    handleReasoningChange, handleAgentSelect, handleToggleThinking,
+    handleToggleThinking,
+    handleReasoningChange,
     handleStreamingEnabledChange, handleSendShortcutChange,
-    handleAutoOpenFileEnabledChange, handleLongContextChange,
+    handleAutoOpenFileEnabledChange,
   } = useModelProviderState({ addToast, t });
 
   // ── Global drag event interception ──
@@ -271,8 +273,8 @@ const App = () => {
     setMessages, setStatus, setLoading, setLoadingStartTime,
     setIsThinking, setStreamingActive, setHistoryData,
     setCurrentSessionId, setUsagePercentage, setUsageUsedTokens, setUsageMaxTokens,
-    setPermissionMode, setClaudePermissionMode, setCodexPermissionMode,
-    setSelectedClaudeModel, setSelectedCodexModel,
+    setPermissionMode, setClaudePermissionMode,
+    setSelectedClaudeModel,
     setProviderConfigVersion, setActiveProviderConfig,
     setClaudeSettingsAlwaysThinkingEnabled, setStreamingEnabledSetting,
     setSendShortcut, setAutoOpenFileEnabled,
@@ -319,7 +321,7 @@ const App = () => {
     interruptSession,
   } = useMessageSender({
     t, addToast,
-    currentProvider, selectedModel, permissionMode, selectedAgent,
+    currentProvider, selectedModel, activeModelId, permissionMode, selectedAgent,
     sdkStatusLoaded, currentSdkInstalled,
     sentAttachmentsRef, chatInputRef, messagesContainerRef,
     isUserAtBottomRef, userPausedRef, isStreamingRef,
@@ -327,7 +329,6 @@ const App = () => {
     setSettingsInitialTab, setCurrentView,
     forceCreateNewSession,
     handleModeSelect,
-    longContextEnabled,
     openContextUsageDialog,
     closeContextUsageDialog,
   });
@@ -490,27 +491,22 @@ const App = () => {
           currentProvider={currentProvider}
           selectedModel={selectedModel}
           permissionMode={permissionMode}
-          selectedAgent={selectedAgent}
           sdkStatusLoaded={sdkStatusLoaded}
           currentSdkInstalled={currentSdkInstalled}
           activeProviderConfig={activeProviderConfig}
           claudeSettingsAlwaysThinkingEnabled={claudeSettingsAlwaysThinkingEnabled}
           reasoningEffort={reasoningEffort}
-          streamingEnabledSetting={streamingEnabledSetting}
           sendShortcut={sendShortcut}
           autoOpenFileEnabled={autoOpenFileEnabled}
-          longContextEnabled={longContextEnabled}
           usagePercentage={usagePercentage}
           usageUsedTokens={usageUsedTokens}
           usageMaxTokens={usageMaxTokens}
+          imageInputSupported={imageInputSupported}
           onModeSelect={handleModeSelect}
           onModelSelect={handleModelSelect}
-          onAgentSelect={handleAgentSelect}
           onReasoningChange={handleReasoningChange}
           onToggleThinking={handleToggleThinking}
-          onStreamingEnabledChange={handleStreamingEnabledChange}
           onAutoOpenFileEnabledChange={handleAutoOpenFileEnabledChange}
-          onLongContextChange={handleLongContextChange}
           messageQueue={messageQueue}
           onRemoveFromQueue={dequeueMessage}
         />
@@ -541,7 +537,6 @@ const App = () => {
         onRewindSelectCancel={handleRewindSelectCancel}
         onRewindConfirm={handleRewindConfirm}
         onRewindCancel={handleRewindCancel}
-        currentProvider={currentProvider}
         permissionDialogTimeoutSeconds={permissionDialogTimeoutSeconds}
       />
     </>

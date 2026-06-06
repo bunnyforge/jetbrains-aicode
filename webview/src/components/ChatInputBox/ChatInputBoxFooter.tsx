@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { DropdownItemData, DropdownPosition, PermissionMode, ReasoningEffort, SelectedAgent } from './types.js';
+import type { DropdownItemData, DropdownPosition, PermissionMode, ReasoningEffort } from './types.js';
 import type { TooltipState } from './hooks/useTooltip.js';
 import { ButtonArea } from './ButtonArea.js';
 import { CompletionDropdown } from './Dropdown/index.js';
@@ -34,15 +34,7 @@ export function ChatInputBoxFooter({
   onEnhancePrompt,
   alwaysThinkingEnabled,
   onToggleThinking,
-  streamingEnabled,
-  onStreamingEnabledChange,
-  selectedAgent,
-  onAgentSelect,
-  onOpenAgentSettings,
   onAddModel,
-  onClearAgent,
-  longContextEnabled = true,
-  onLongContextChange,
   fileCompletion,
   commandCompletion,
   agentCompletion,
@@ -69,15 +61,7 @@ export function ChatInputBoxFooter({
   onEnhancePrompt: () => void;
   alwaysThinkingEnabled?: boolean;
   onToggleThinking?: (enabled: boolean) => void;
-  streamingEnabled?: boolean;
-  onStreamingEnabledChange?: (enabled: boolean) => void;
-  selectedAgent?: SelectedAgent | null;
-  onAgentSelect?: (agent: SelectedAgent) => void;
-  onOpenAgentSettings?: () => void;
   onAddModel?: () => void;
-  onClearAgent: () => void;
-  longContextEnabled?: boolean;
-  onLongContextChange?: (enabled: boolean) => void;
   fileCompletion: CompletionController;
   commandCompletion: CompletionController;
   agentCompletion: CompletionController;
@@ -116,15 +100,7 @@ export function ChatInputBoxFooter({
         onEnhancePrompt={onEnhancePrompt}
         alwaysThinkingEnabled={alwaysThinkingEnabled}
         onToggleThinking={onToggleThinking}
-        streamingEnabled={streamingEnabled}
-        onStreamingEnabledChange={onStreamingEnabledChange}
-        selectedAgent={selectedAgent}
-        onAgentSelect={(agent) => onAgentSelect?.(agent)}
-        onOpenAgentSettings={onOpenAgentSettings}
         onAddModel={onAddModel}
-        onClearAgent={onClearAgent}
-        longContextEnabled={longContextEnabled}
-        onLongContextChange={onLongContextChange}
       />
 
       {/* @ file reference dropdown menu */}

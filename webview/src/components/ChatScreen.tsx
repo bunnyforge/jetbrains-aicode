@@ -82,29 +82,24 @@ export interface ChatScreenProps {
   currentProvider: ProviderState['currentProvider'];
   selectedModel: ProviderState['selectedModel'];
   permissionMode: ProviderState['permissionMode'];
-  selectedAgent: ProviderState['selectedAgent'];
   sdkStatusLoaded: ProviderState['sdkStatusLoaded'];
   currentSdkInstalled: ProviderState['currentSdkInstalled'];
   activeProviderConfig: ProviderState['activeProviderConfig'];
   claudeSettingsAlwaysThinkingEnabled: ProviderState['claudeSettingsAlwaysThinkingEnabled'];
   reasoningEffort: ProviderState['reasoningEffort'];
-  streamingEnabledSetting: ProviderState['streamingEnabledSetting'];
   sendShortcut: ProviderState['sendShortcut'];
   autoOpenFileEnabled: ProviderState['autoOpenFileEnabled'];
-  longContextEnabled: ProviderState['longContextEnabled'];
   usagePercentage: ProviderState['usagePercentage'];
   usageUsedTokens: ProviderState['usageUsedTokens'];
   usageMaxTokens: ProviderState['usageMaxTokens'];
+  imageInputSupported: ProviderState['imageInputSupported'];
 
   // Model handlers
   onModeSelect: ProviderState['handleModeSelect'];
   onModelSelect: ProviderState['handleModelSelect'];
-  onAgentSelect: ProviderState['handleAgentSelect'];
   onReasoningChange: ProviderState['handleReasoningChange'];
   onToggleThinking: ProviderState['handleToggleThinking'];
-  onStreamingEnabledChange: ProviderState['handleStreamingEnabledChange'];
   onAutoOpenFileEnabledChange: ProviderState['handleAutoOpenFileEnabledChange'];
-  onLongContextChange: ProviderState['handleLongContextChange'];
 
   // Message queue
   messageQueue: MessageQueueValue;
@@ -130,14 +125,13 @@ export const ChatScreen = ({
   onUndoFile, onDiscardAll, onKeepAll,
   onSubmit, onInterrupt, onRewind,
   onNavigateToProviderSettings, onProviderSelect,
-  currentProvider, selectedModel, permissionMode, selectedAgent,
+  currentProvider, selectedModel, permissionMode,
   sdkStatusLoaded, currentSdkInstalled,
   activeProviderConfig, claudeSettingsAlwaysThinkingEnabled,
-  reasoningEffort, streamingEnabledSetting, sendShortcut, autoOpenFileEnabled,
-  longContextEnabled, usagePercentage, usageUsedTokens, usageMaxTokens,
-  onModeSelect, onModelSelect, onAgentSelect, onReasoningChange, onToggleThinking,
-  onStreamingEnabledChange,
-  onAutoOpenFileEnabledChange, onLongContextChange,
+  reasoningEffort, sendShortcut, autoOpenFileEnabled,
+  usagePercentage, usageUsedTokens, usageMaxTokens, imageInputSupported,
+  onModeSelect, onModelSelect, onReasoningChange, onToggleThinking,
+  onAutoOpenFileEnabledChange,
   messageQueue, onRemoveFromQueue,
 }: ChatScreenProps) => {
   const { t } = useTranslation();
@@ -286,6 +280,10 @@ export const ChatScreen = ({
           usageMaxTokens={usageMaxTokens}
           showUsage={true}
           alwaysThinkingEnabled={activeProviderConfig?.settingsConfig?.alwaysThinkingEnabled ?? claudeSettingsAlwaysThinkingEnabled}
+          imageInputSupported={imageInputSupported}
+          onUnsupportedImageAttempt={() => {
+            addToast(t('toast.imageNotSupportedByModel'), 'warning');
+          }}
           placeholder={sendShortcut === 'cmdEnter' ? t('chat.inputPlaceholderCmdEnter') : t('chat.inputPlaceholderEnter')}
           sdkInstalled={currentSdkInstalled}
           sdkStatusLoading={!sdkStatusLoaded}
@@ -303,11 +301,7 @@ export const ChatScreen = ({
           reasoningEffort={reasoningEffort}
           onReasoningChange={onReasoningChange}
           onToggleThinking={onToggleThinking}
-          streamingEnabled={streamingEnabledSetting}
-          onStreamingEnabledChange={onStreamingEnabledChange}
           sendShortcut={sendShortcut}
-          selectedAgent={selectedAgent}
-          onAgentSelect={onAgentSelect}
           activeFile={contextInfo?.file}
           selectedLines={contextInfo?.startLine !== undefined && contextInfo?.endLine !== undefined
             ? (contextInfo.startLine === contextInfo.endLine
@@ -315,14 +309,6 @@ export const ChatScreen = ({
                 : `L${contextInfo.startLine}-${contextInfo.endLine}`)
             : undefined}
           onClearContext={() => setContextInfo(null)}
-          onOpenAgentSettings={() => {
-            setSettingsInitialTab('agents');
-            setCurrentView('settings');
-          }}
-          onOpenPromptSettings={() => {
-            setSettingsInitialTab('prompts');
-            setCurrentView('settings');
-          }}
           onOpenModelSettings={() => {
             setAddModelDialogOpen(true);
           }}
@@ -338,8 +324,6 @@ export const ChatScreen = ({
           onRemoveFromQueue={onRemoveFromQueue}
           autoOpenFileEnabled={autoOpenFileEnabled}
           onAutoOpenFileEnabledChange={onAutoOpenFileEnabledChange}
-          longContextEnabled={longContextEnabled}
-          onLongContextChange={onLongContextChange}
         />
       </div>
     </>
